@@ -17,6 +17,7 @@
   };
 
   var selEmpresa = document.getElementById("selEmpresa");
+  var txtEmpresa = document.getElementById("txtEmpresa");
   var txtNombreEmpresa = document.getElementById("txtNombreEmpresa");
   var selTipoDoc = document.getElementById("selTipoDoc");
   var txtTipoDocumento = document.getElementById("txtTipoDocumento");
@@ -104,7 +105,7 @@
   }
 
   function cumpleCriteriosCompletos() {
-    return !!txtNombreEmpresa.value.trim()
+    return !!txtEmpresa.value.trim()
       && !!txtTipoDocumento.value.trim()
       && !!txtPrefijo.value.trim()
       && !!txtNoDocumento.value.trim();
@@ -115,17 +116,17 @@
   }
 
   function validarCamposObligatorios() {
-    var nombreEmpresaVacio = !txtNombreEmpresa.value.trim();
+    var empresaVacia = !txtEmpresa.value.trim();
     var tipoDocumentoVacio = !txtTipoDocumento.value.trim();
     var prefijoVacio = !txtPrefijo.value.trim();
     var noDocumentoVacio = !txtNoDocumento.value.trim();
 
-    marcarInvalido(selEmpresa, nombreEmpresaVacio);
+    marcarInvalido(selEmpresa, empresaVacia);
     marcarInvalido(selTipoDoc, tipoDocumentoVacio);
     marcarInvalido(txtPrefijo, prefijoVacio);
     marcarInvalido(txtNoDocumento, noDocumentoVacio);
 
-    return !nombreEmpresaVacio && !tipoDocumentoVacio && !prefijoVacio && !noDocumentoVacio;
+    return !empresaVacia && !tipoDocumentoVacio && !prefijoVacio && !noDocumentoVacio;
   }
 
   function alCambiarFiltro() {
@@ -171,7 +172,8 @@
     (empresas || []).forEach(function (empresa) {
       var option = document.createElement("option");
       option.value = empresa.codigo || "";
-      option.textContent = empresa.nombre || "";
+      // Formato requerido: "Codigo - NombreEmpresa" (ej. "07 - Fundacion Campobell")
+      option.textContent = (empresa.codigo || "") + " - " + (empresa.nombre || "");
       option.setAttribute("data-nombre", empresa.nombre || "");
       selEmpresa.appendChild(option);
     });
@@ -228,12 +230,13 @@
 
   function alSeleccionarEmpresa() {
     var op = selEmpresa.options[selEmpresa.selectedIndex];
+    txtEmpresa.value = selEmpresa.value || "";
     txtNombreEmpresa.value = (op && op.value) ? (op.getAttribute("data-nombre") || "") : "";
     marcarInvalido(selEmpresa, false);
 
     selTipoDoc.value = "";
     txtTipoDocumento.value = "";
-    cargarTipoDocumentos(selEmpresa.value || null);
+    cargarTipoDocumentos(txtEmpresa.value || null);
     alCambiarFiltro();
   }
 
@@ -312,7 +315,7 @@
     }
 
     var parametros = {
-      empresa: selEmpresa.value,
+      empresa: txtEmpresa.value.trim(),
       tipoDoc: txtTipoDocumento.value.trim(),
       prefijo: txtPrefijo.value.trim(),
       noDocumento: txtNoDocumento.value.trim()

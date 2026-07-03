@@ -2,9 +2,9 @@ namespace webXMLRespuestaFactElect.Models;
 
 /// <summary>
 /// Representa una empresa para el dropdown F-1 (Empresa).
-/// SUPUESTO S-1: se asume que GetEmpresas devuelve al menos un codigo/id y un nombre;
-/// el mapeo tolerante a nombres de columna se resuelve en FactElectronicaRepository.
-/// Debe confirmarse con el Lead el nombre exacto de las columnas de salida.
+/// S-1 CONFIRMADO: Getempresas devuelve, entre otras, las columnas "empresa"
+/// (codigo) y "NombreEmpresa", mapeadas aqui a Codigo/Nombre. El dropdown se
+/// muestra como "Codigo - Nombre" (ej. "07 - Fundacion Campobell").
 /// </summary>
 public sealed class EmpresaViewModel
 {

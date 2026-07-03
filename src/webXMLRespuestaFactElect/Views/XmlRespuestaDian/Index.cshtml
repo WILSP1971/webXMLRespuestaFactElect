@@ -12,7 +12,7 @@
         <form id="frmBuscarXml" novalidate>
             <div class="row g-3 align-items-end">
 
-                <!-- F-1: Empresas -->
+                <!-- F-1: Empresas (Codigo - NombreEmpresa, value = codigo empresa) -->
                 <div class="col-12 col-md-6 col-lg-4">
                     <label for="selEmpresa" class="form-label">Empresa</label>
                     <select id="selEmpresa" name="empresa" class="form-select" required
@@ -22,6 +22,8 @@
                     <div id="selEmpresaHelp" class="form-text d-none text-danger">
                         No fue posible cargar las empresas. Intente de nuevo.
                     </div>
+                    <!-- Guarda el codigo de empresa seleccionado (no visible, no ocupa grid) -->
+                    <input type="hidden" id="txtEmpresa" name="txtEmpresa" value="" />
                 </div>
 
                 <!-- F-2: Nombre de Empresa (solo lectura) -->

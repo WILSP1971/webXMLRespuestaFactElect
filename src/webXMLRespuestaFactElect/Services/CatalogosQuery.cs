@@ -11,19 +11,20 @@ namespace webXMLRespuestaFactElect.Services;
 /// </summary>
 public static class CatalogosQuery
 {
-    public const string NombreStoredProcedureEmpresas = "GetEmpresas";
+    public const string NombreStoredProcedureEmpresas = "Getempresas";
     public const string NombreStoredProcedureTipoDocumentos = "Get_TipoDocumentosFactElect";
 
-    // SUPUESTO S-1: nombres de columna de GetEmpresas no confirmados; se intentan varias
-    // variantes razonables. Confirmar con el Lead los nombres exactos.
+    // S-1 CONFIRMADO por el Lead: Getempresas devuelve, entre otras, las columnas
+    // "empresa" (codigo) y "NombreEmpresa". Se mantienen las variantes previas como
+    // tolerancia adicional.
     private static readonly string[] PosiblesColumnasCodigoEmpresa =
     {
-        "Codigo", "CodEmpresa", "CodigoEmpresa", "IdEmpresa", "Id", "Empresa"
+        "Empresa", "Codigo", "CodEmpresa", "CodigoEmpresa", "IdEmpresa", "Id"
     };
 
     private static readonly string[] PosiblesColumnasNombreEmpresa =
     {
-        "Nombre", "NombreEmpresa", "RazonSocial", "Descripcion", "Empresa_Nombre"
+        "NombreEmpresa", "Nombre", "RazonSocial", "Descripcion", "Empresa_Nombre"
     };
 
     // S-2 CONFIRMADO por el Lead: Get_TipoDocumentosFactElect devuelve las columnas
