@@ -26,15 +26,17 @@ public static class CatalogosQuery
         "Nombre", "NombreEmpresa", "RazonSocial", "Descripcion", "Empresa_Nombre"
     };
 
-    // SUPUESTO S-2: nombres de columna de Get_TipoDocumentosFactElect no confirmados.
+    // S-2 CONFIRMADO por el Lead: Get_TipoDocumentosFactElect devuelve las columnas
+    // Empresa, CodDocumento, NombreDocumento, TipoDocumento. Se mantienen las
+    // variantes previas como tolerancia adicional.
     private static readonly string[] PosiblesColumnasCodigoTipoDoc =
     {
-        "Codigo", "CodTipoDoc", "TipoDoc", "IdTipoDoc", "Id"
+        "CodDocumento", "Codigo", "CodTipoDoc", "TipoDoc", "IdTipoDoc", "Id"
     };
 
     private static readonly string[] PosiblesColumnasDescripcionTipoDoc =
     {
-        "Descripcion", "Nombre", "NombreTipoDoc", "TipoDocumento"
+        "NombreDocumento", "Descripcion", "Nombre", "NombreTipoDoc", "TipoDocumento"
     };
 
     public static EmpresaViewModel MapearEmpresa(IDataRecord fila)

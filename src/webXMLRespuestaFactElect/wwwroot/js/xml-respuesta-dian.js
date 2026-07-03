@@ -1,13 +1,14 @@
 /*
- * Version 6 - DIAGNOSTICO PURO
+ * Vista "XML Respuesta Dian" (SPEC-003).
  *
- * El objetivo es VER los datos que llegan del SP. La logica de "FA - FACTURA
- * ESCULAPIO" se aplicara despues, una vez que vea la forma real.
+ * Contrato de datos confirmado:
+ *   - ObtenerEmpresas          -> [{ codigo, nombre }]
+ *   - ObtenerTipoDocumentos    -> [{ codigo, descripcion }]  (CodDocumento/NombreDocumento)
+ *   - Buscar (POST)            -> body { empresa, tipoDoc, prefijo, noDocumento }
+ *                                  (deben coincidir con BuscarXmlRequest: Empresa/TipoDoc/Prefijo/NoDocumento)
  */
 (function () {
   "use strict";
-
-  console.log("[XML-RESPUESTA-DIAN-V6] JS cargado");
 
   var urls = {
     empresas: "/XmlRespuestaDian/ObtenerEmpresas",
@@ -18,6 +19,7 @@
   var selEmpresa = document.getElementById("selEmpresa");
   var txtNombreEmpresa = document.getElementById("txtNombreEmpresa");
   var selTipoDoc = document.getElementById("selTipoDoc");
+  var txtTipoDocumento = document.getElementById("txtTipoDocumento");
   var txtPrefijo = document.getElementById("txtPrefijo");
   var txtNoDocumento = document.getElementById("txtNoDocumento");
   var frmBuscarXml = document.getElementById("frmBuscarXml");
@@ -54,9 +56,9 @@
       "z-index: 9999; border-radius: 0.375rem; pointer-events: none;";
     panelResultadoOverlay.innerHTML =
       '<div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">' +
-        '<span class="visually-hidden">Procesando...</span>' +
+        '<span class="visually-hidden">En progreso...</span>' +
       '</div>' +
-      '<div class="mt-3 text-primary fw-bold">Procesando...</div>';
+      '<div class="mt-3 text-primary fw-bold">En progreso...</div>';
   }
 
   var BTON_BUSCAR_NORMAL_HTML =
@@ -67,7 +69,7 @@
   var BTON_BUSCAR_CARGANDO_HTML =
     '<span class="d-inline-flex align-items-center">' +
       '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
-      '<span>Procesando...</span>' +
+      '<span>En progreso...</span>' +
     '</span>';
 
   var registrosActuales = [];
@@ -75,58 +77,6 @@
   var ultimaBusquedaExitosa = null;
 
   // -- Utilidades ----------------------------------------------
-
-  function getStringFields(item) {
-    var fields = [];
-    for (var key in item) {
-      if (Object.prototype.hasOwnProperty.call(item, key)) {
-        var v = item[key];
-        if (typeof v !== "object" && v !== null && v !== undefined && v !== "") {
-          fields.push({ key: key, value: String(v), length: String(v).length });
-        }
-      }
-    }
-    fields.sort(function (a, b) { return a.length - b.length; });
-    return fields;
-  }
-
-  // Poblador BRUTO: muestra TODOS los campos del item.
-  // Asi sabras QUE hay, sin importar los nombres.
-  function poblarSelectCrudo(select, opciones, placeholder) {
-    select.innerHTML = "";
-
-    var optPlaceholder = document.createElement("option");
-    optPlaceholder.value = "";
-    optPlaceholder.selected = true;
-    optPlaceholder.disabled = true;
-    optPlaceholder.textContent = placeholder;
-    select.appendChild(optPlaceholder);
-
-    (opciones || []).forEach(function (item, idx) {
-      var fields = getStringFields(item);
-
-      // value = el campo mas corto (suele ser el codigo). Si hay varios
-      // del mismo largo, agarramos el primero.
-      var valor = fields.length > 0 ? fields[0].value : "";
-      var texto = fields.length > 1
-        ? fields.map(function (f) { return f.key + "=" + f.value; }).join(" | ")
-        : (fields[0] ? fields[0].key + "=" + fields[0].value : "(vacio)");
-
-      var option = document.createElement("option");
-      option.value = valor;
-      option.textContent = texto;
-      option.setAttribute("data-raw", JSON.stringify(item));
-      option.setAttribute("data-codigo", fields.length > 0 ? fields[0].key : "");
-      option.setAttribute("data-texto", fields.length > 1 ? fields[fields.length - 1].key : "");
-
-      select.appendChild(option);
-
-      // Logging uno a uno para que veas en consola
-      console.log("[ITEM " + idx + "] " + JSON.stringify(item));
-    });
-
-    console.log("[SELECT] options totales = " + (select.options.length - 1));
-  }
 
   function slug(texto) {
     if (!texto) return "";
@@ -154,7 +104,28 @@
   }
 
   function cumpleCriteriosCompletos() {
-    return !!selEmpresa.value && !!selTipoDoc.value && !!txtPrefijo.value.trim() && !!txtNoDocumento.value.trim();
+    return !!txtNombreEmpresa.value.trim()
+      && !!txtTipoDocumento.value.trim()
+      && !!txtPrefijo.value.trim()
+      && !!txtNoDocumento.value.trim();
+  }
+
+  function marcarInvalido(campo, esInvalido) {
+    if (campo) campo.classList.toggle("is-invalid", !!esInvalido);
+  }
+
+  function validarCamposObligatorios() {
+    var nombreEmpresaVacio = !txtNombreEmpresa.value.trim();
+    var tipoDocumentoVacio = !txtTipoDocumento.value.trim();
+    var prefijoVacio = !txtPrefijo.value.trim();
+    var noDocumentoVacio = !txtNoDocumento.value.trim();
+
+    marcarInvalido(selEmpresa, nombreEmpresaVacio);
+    marcarInvalido(selTipoDoc, tipoDocumentoVacio);
+    marcarInvalido(txtPrefijo, prefijoVacio);
+    marcarInvalido(txtNoDocumento, noDocumentoVacio);
+
+    return !nombreEmpresaVacio && !tipoDocumentoVacio && !prefijoVacio && !noDocumentoVacio;
   }
 
   function alCambiarFiltro() {
@@ -187,13 +158,50 @@
 
   // -- Cargas iniciales ---------------------------------------
 
+  function poblarSelectEmpresas(empresas) {
+    selEmpresa.innerHTML = "";
+
+    var optPlaceholder = document.createElement("option");
+    optPlaceholder.value = "";
+    optPlaceholder.selected = true;
+    optPlaceholder.disabled = true;
+    optPlaceholder.textContent = "Seleccione una empresa...";
+    selEmpresa.appendChild(optPlaceholder);
+
+    (empresas || []).forEach(function (empresa) {
+      var option = document.createElement("option");
+      option.value = empresa.codigo || "";
+      option.textContent = empresa.nombre || "";
+      option.setAttribute("data-nombre", empresa.nombre || "");
+      selEmpresa.appendChild(option);
+    });
+  }
+
+  function poblarSelectTipoDocumentos(tipos) {
+    selTipoDoc.innerHTML = "";
+
+    var optPlaceholder = document.createElement("option");
+    optPlaceholder.value = "";
+    optPlaceholder.selected = true;
+    optPlaceholder.disabled = true;
+    optPlaceholder.textContent = "Seleccione un tipo...";
+    selTipoDoc.appendChild(optPlaceholder);
+
+    (tipos || []).forEach(function (tipo) {
+      var option = document.createElement("option");
+      option.value = tipo.codigo || "";
+      // Formato requerido: "CodDocumento - NombreDocumento" (ej. "FA - FACTURA ESCULAPIO")
+      option.textContent = (tipo.codigo || "") + " - " + (tipo.descripcion || "");
+      selTipoDoc.appendChild(option);
+    });
+  }
+
   function cargarEmpresas() {
     selEmpresaHelp.classList.add("d-none");
     return fetch(urls.empresas, { headers: { Accept: "application/json" } })
       .then(function (r) { if (!r.ok) throw new Error("Status " + r.status); return r.json(); })
       .then(function (empresas) {
-        console.log("[EMPRESAS] " + empresas.length + " items");
-        poblarSelectCrudo(selEmpresa, empresas, "Seleccione una empresa...");
+        poblarSelectEmpresas(empresas);
       })
       .catch(function (err) {
         console.error("[EMPRESAS] error:", err);
@@ -209,8 +217,7 @@
     return fetch(url, { headers: { Accept: "application/json" } })
       .then(function (r) { if (!r.ok) throw new Error("Status " + r.status); return r.json(); })
       .then(function (tipos) {
-        console.log("[TIPOS_DOC] " + (tipos ? tipos.length : 0) + " items, empresa=" + (empresa || "*"));
-        poblarSelectCrudo(selTipoDoc, tipos, "Seleccione un tipo...");
+        poblarSelectTipoDocumentos(tipos);
         actualizarDisponibilidadBuscar();
       })
       .catch(function (err) {
@@ -221,22 +228,18 @@
 
   function alSeleccionarEmpresa() {
     var op = selEmpresa.options[selEmpresa.selectedIndex];
-    var codigo = op && op.value ? op.value : "";
+    txtNombreEmpresa.value = (op && op.value) ? (op.getAttribute("data-nombre") || "") : "";
+    marcarInvalido(selEmpresa, false);
 
-    // Nombre de empresa: parseamos "key=value | key=value"
-    var raw = op && op.value ? op.getAttribute("data-raw") : "";
-    var nombreEmpresa = "";
-    try {
-      var data = JSON.parse(raw);
-      // heuristica: tomar el campo mas largo
-      var fields = getStringFields(data);
-      if (fields.length > 1) nombreEmpresa = fields[fields.length - 1].value;
-      else if (fields.length === 1) nombreEmpresa = fields[0].value;
-    } catch (e) {}
-
-    txtNombreEmpresa.value = nombreEmpresa;
     selTipoDoc.value = "";
-    cargarTipoDocumentos(codigo);
+    txtTipoDocumento.value = "";
+    cargarTipoDocumentos(selEmpresa.value || null);
+    alCambiarFiltro();
+  }
+
+  function alSeleccionarTipoDoc() {
+    txtTipoDocumento.value = selTipoDoc.value || "";
+    marcarInvalido(selTipoDoc, false);
     alCambiarFiltro();
   }
 
@@ -256,6 +259,7 @@
   function limpiarSeleccion() {
     filaSeleccionada = null;
     txtVisorXml.value = "";
+    if (btnDescargar) btnDescargar.disabled = true;
   }
 
   function seleccionarFila(indice) {
@@ -263,6 +267,7 @@
     filas.forEach(function (f, i) { f.classList.toggle("table-active", i === indice); });
     filaSeleccionada = registrosActuales[indice];
     txtVisorXml.value = filaSeleccionada.respuestaXml || "";
+    if (btnDescargar) btnDescargar.disabled = false;
   }
 
   function renderizarRegistros(registros) {
@@ -298,16 +303,20 @@
 
   function alEnviarFormulario(evento) {
     evento.preventDefault();
-    if (!cumpleCriteriosCompletos()) return;
+
+    if (!validarCamposObligatorios()) {
+      estadoErrorMensaje.textContent =
+        "Complete empresa, tipo de documento, prefijo y numero de documento antes de buscar.";
+      mostrarEstado("error");
+      return;
+    }
 
     var parametros = {
-      codEmpresa: selEmpresa.value,
-      tipoDocumento: selTipoDoc.value,
+      empresa: selEmpresa.value,
+      tipoDoc: txtTipoDocumento.value.trim(),
       prefijo: txtPrefijo.value.trim(),
       noDocumento: txtNoDocumento.value.trim()
     };
-
-    console.log("[BUSCAR] enviando:", JSON.stringify(parametros));
 
     var tiempoInicio = Date.now();
     var MIN_DURACION_MS = 500;
@@ -324,7 +333,6 @@
       .then(function (r) {
         return r.text().then(function (txt) {
           var d; try { d = JSON.parse(txt); } catch (e) { d = {}; }
-          console.log("[BUSCAR] status " + r.status, d);
           return { ok: r.ok, datos: d };
         });
       })
@@ -338,8 +346,8 @@
         if (!datos.registros || datos.registros.length === 0) {
           if (estadoSinResultadosDetalle) {
             estadoSinResultadosDetalle.textContent =
-              "Empresa: " + parametros.codEmpresa + " | " +
-              "Tipo: " + parametros.tipoDocumento + " | " +
+              "Empresa: " + parametros.empresa + " | " +
+              "Tipo: " + parametros.tipoDoc + " | " +
               "Prefijo: " + parametros.prefijo + " | " +
               "No. documento: " + parametros.noDocumento;
           }
@@ -368,12 +376,11 @@
     var blob = new Blob([filaSeleccionada.respuestaXml || ""], { type: "application/xml" });
     var urlBlob = URL.createObjectURL(blob);
 
-    var op = selEmpresa.options[selEmpresa.selectedIndex];
-    var nombreEmpresa = (op && op.value) ? extractNombreDeOpcion(op.textContent) : "";
+    var nombreEmpresa = txtNombreEmpresa.value || "";
     var nombreArchivo =
       "RespuestaDian_" +
       (nombreEmpresa ? slug(nombreEmpresa) + "_" : "") +
-      (ultimaBusquedaExitosa.tipoDocumento || "") +
+      (ultimaBusquedaExitosa.tipoDoc || "") +
       "_" +
       (ultimaBusquedaExitosa.prefijo || "") +
       "-" +
@@ -388,20 +395,10 @@
     URL.revokeObjectURL(urlBlob);
   }
 
-  function extractNombreDeOpcion(texto) {
-    // "key1=val1 | key2=val2" -> devolver el valor mas largo
-    var parts = texto.split("|").map(function (p) {
-      var idx = p.indexOf("=");
-      return idx > 0 ? p.substring(idx + 1).trim() : p.trim();
-    });
-    if (parts.length === 0) return "";
-    return parts.reduce(function (a, b) { return b.length > a.length ? b : a; }, "");
-  }
-
   // -- Eventos ------------------------------------------------
 
   selEmpresa.addEventListener("change", alSeleccionarEmpresa);
-  selTipoDoc.addEventListener("change", alCambiarFiltro);
+  selTipoDoc.addEventListener("change", alSeleccionarTipoDoc);
   txtPrefijo.addEventListener("input", alCambiarFiltro);
   txtNoDocumento.addEventListener("input", alCambiarFiltro);
   frmBuscarXml.addEventListener("submit", alEnviarFormulario);
@@ -409,6 +406,7 @@
 
   // -- Arranque ------------------------------------------------
 
+  if (btnDescargar) btnDescargar.disabled = true;
   if (btnBuscar) btnBuscar.innerHTML = BTON_BUSCAR_NORMAL_HTML;
   cargarEmpresas();
   cargarTipoDocumentos(null);

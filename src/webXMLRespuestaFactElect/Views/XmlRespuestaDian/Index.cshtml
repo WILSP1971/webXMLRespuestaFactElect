@@ -32,7 +32,7 @@
                            aria-label="Nombre de empresa (completado automáticamente)" />
                 </div>
 
-                <!-- F-3: Tipo de Documento (Codigo - Descripcion, value = Codigo) -->
+                <!-- F-3: Tipo de Documento (Codigo - Descripcion, value = CodDocumento) -->
                 <div class="col-12 col-md-6 col-lg-4">
                     <label for="selTipoDoc" class="form-label">Tipo de documento</label>
                     <select id="selTipoDoc" name="tipoDoc" class="form-select" required
@@ -42,6 +42,8 @@
                     <div id="selTipoDocHelp" class="form-text d-none text-danger">
                         No fue posible cargar los tipos de documento. Intente de nuevo.
                     </div>
+                    <!-- Guarda el CodDocumento seleccionado (no visible, no ocupa grid) -->
+                    <input type="hidden" id="txtTipoDocumento" name="txtTipoDocumento" value="" />
                 </div>
 
                 <!-- F-4: Prefijo -->

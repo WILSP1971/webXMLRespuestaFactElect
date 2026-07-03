@@ -2,9 +2,10 @@ namespace webXMLRespuestaFactElect.Models;
 
 /// <summary>
 /// Representa un tipo de documento para el dropdown F-3 (Tipo de documento).
-/// SUPUESTO S-2: se asume que Get_TipoDocumentosFactElect no recibe parametros y
-/// devuelve un codigo + una descripcion; debe confirmarse con el Lead la firma real
-/// (podria filtrar por empresa) y los nombres exactos de columna.
+/// S-2 CONFIRMADO: Get_TipoDocumentosFactElect recibe @Empresa (obligatorio) y
+/// devuelve, entre otras, las columnas CodDocumento y NombreDocumento, mapeadas aqui
+/// a Codigo/Descripcion. El dropdown se muestra como "Codigo - Descripcion"
+/// (ej. "FA - FACTURA ESCULAPIO").
 /// </summary>
 public sealed class TipoDocumentoViewModel
 {
