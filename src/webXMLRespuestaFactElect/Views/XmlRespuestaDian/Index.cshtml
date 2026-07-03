@@ -1,0 +1,126 @@
+@{
+    ViewData["Title"] = "XML Respuesta Dian";
+}
+
+<h1 class="h3 mb-4">XML Respuesta Dian</h1>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h2 class="h6 mb-0">Criterios de búsqueda</h2>
+    </div>
+    <div class="card-body">
+        <form id="frmBuscarXml" novalidate>
+            <div class="row g-3 align-items-end">
+
+                <!-- F-1: Empresas -->
+                <div class="col-12 col-md-6 col-lg-4">
+                    <label for="selEmpresa" class="form-label">Empresa</label>
+                    <select id="selEmpresa" name="empresa" class="form-select" required
+                            aria-describedby="selEmpresaHelp">
+                        <option value="" selected disabled>Seleccione una empresa&hellip;</option>
+                    </select>
+                    <div id="selEmpresaHelp" class="form-text d-none text-danger">
+                        No fue posible cargar las empresas. Intente de nuevo.
+                    </div>
+                </div>
+
+                <!-- F-2: Nombre de Empresa (solo lectura) -->
+                <div class="col-12 col-md-6 col-lg-4">
+                    <label for="txtNombreEmpresa" class="form-label">Nombre de empresa</label>
+                    <input type="text" id="txtNombreEmpresa" class="form-control-plaintext border-bottom"
+                           readonly tabindex="-1" placeholder="&mdash;"
+                           aria-label="Nombre de empresa (completado automáticamente)" />
+                </div>
+
+                <!-- F-3: Tipo de Documento -->
+                <div class="col-12 col-md-6 col-lg-4">
+                    <label for="selTipoDoc" class="form-label">Tipo de documento</label>
+                    <select id="selTipoDoc" name="tipoDoc" class="form-select" required
+                            aria-describedby="selTipoDocHelp">
+                        <option value="" selected disabled>Seleccione un tipo&hellip;</option>
+                    </select>
+                    <div id="selTipoDocHelp" class="form-text d-none text-danger">
+                        No fue posible cargar los tipos de documento. Intente de nuevo.
+                    </div>
+                </div>
+
+                <!-- F-4: Prefijo -->
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label for="txtPrefijo" class="form-label">Prefijo</label>
+                    <input type="text" id="txtPrefijo" name="prefijo" class="form-control"
+                           placeholder="Ej. 33" maxlength="10" required />
+                </div>
+
+                <!-- F-5: No. Documento -->
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label for="txtNoDocumento" class="form-label">No. documento</label>
+                    <input type="number" inputmode="numeric" id="txtNoDocumento" name="noDocumento"
+                           class="form-control" placeholder="Ej. 185138" min="0" required />
+                </div>
+
+                <!-- F-6: Buscar -->
+                <div class="col-12 col-lg-2 d-grid">
+                    <button type="submit" id="btnBuscar" class="btn btn-primary" disabled>
+                        <i class="bi bi-search me-1" aria-hidden="true"></i>
+                        <span class="btn-label">Buscar</span>
+                        <span class="spinner-border spinner-border-sm ms-1 d-none" role="status"
+                              aria-hidden="true" id="btnBuscarSpinner"></span>
+                    </button>
+                </div>
+
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm" id="panelResultado" aria-live="polite">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h2 class="h6 mb-0">Resultado</h2>
+        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btnDescargar">
+            <i class="bi bi-download me-1" aria-hidden="true"></i>
+            Descargar XML
+        </button>
+    </div>
+    <div class="card-body">
+
+        <!-- Estado inicial (antes de buscar) -->
+        <div id="estadoInicial" class="text-center text-muted py-5">
+            <i class="bi bi-search fs-1 d-block mb-2" aria-hidden="true"></i>
+            Complete los criterios de búsqueda y presione <strong>Buscar</strong>
+            para consultar el XML de respuesta.
+        </div>
+
+        <!-- Estado cargando -->
+        <div id="estadoCargando" class="text-center text-muted py-5 d-none">
+            <div class="spinner-border text-primary mb-2" role="status">
+                <span class="visually-hidden">Cargando&hellip;</span>
+            </div>
+            <div>Consultando el XML de respuesta&hellip;</div>
+        </div>
+
+        <!-- Estado sin resultados (NF-3 / AC-6) -->
+        <div id="estadoSinResultados" class="text-center text-muted py-5 d-none">
+            <i class="bi bi-file-earmark-x fs-1 d-block mb-2" aria-hidden="true"></i>
+            No se encontró información para los criterios ingresados.
+            <div class="small">Verifique la empresa, el tipo de documento, el prefijo y el número.</div>
+        </div>
+
+        <!-- Estado error de conexión (NF-2 / AC-C3) -->
+        <div id="estadoError" class="alert alert-danger d-none" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+            <span id="estadoErrorMensaje">No fue posible completar la consulta. Intente nuevamente en unos minutos.</span>
+            <div class="small mt-1">Si el problema persiste, contacte al administrador.</div>
+        </div>
+
+        <!-- Estado con resultado (F-7) -->
+        <div id="estadoConXml" class="d-none">
+            <pre id="visorXml" class="xml-viewer" tabindex="0"
+                 aria-label="Contenido del XML de respuesta"><code></code></pre>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/xml-respuesta-dian.js"></script>
+}

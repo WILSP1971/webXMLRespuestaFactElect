@@ -1,0 +1,59 @@
+@{
+    var esVistaXmlRespuestaDian = ViewContext.RouteData.Values["controller"]?.ToString() == "XmlRespuestaDian";
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Facturación Electrónica &mdash; XML DIAN</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand fw-semibold" href="/">
+                    <i class="bi bi-file-earmark-code me-2" aria-hidden="true"></i>
+                    Facturación Electrónica &mdash; XML DIAN
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#navbarPrincipal" aria-controls="navbarPrincipal"
+                        aria-expanded="false" aria-label="Mostrar/ocultar navegación">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarPrincipal">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link @(esVistaXmlRespuestaDian ? "active" : string.Empty)"
+                               aria-current="@(esVistaXmlRespuestaDian ? "page" : null)"
+                               asp-controller="XmlRespuestaDian" asp-action="Index">
+                                XML Respuesta Dian
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">
+                                Otros
+                                <span class="badge text-bg-secondary ms-1">Próximamente</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container my-4">
+        @RenderBody()
+    </main>
+
+    <footer class="text-center text-muted small py-3">
+        Uso interno &mdash; Facturación Electrónica
+    </footer>
+
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

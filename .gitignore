@@ -1,0 +1,44 @@
+# ==== .NET / Visual Studio ====
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+
+# Resultados de publicacion (dotnet publish)
+publish/
+[Pp]ublish/
+*.pubxml
+*.pubxml.user
+
+# Resultados de pruebas
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+
+# ==== CHECKPOINT C3: secretos, NUNCA versionar ====
+# Solo appsettings.example.json (plantilla con placeholders) queda trackeado.
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+
+# web.config generado/editado localmente con secretos reales (variables de entorno
+# de IIS con valores reales). La copia de referencia versionada (src/.../web.config)
+# NO debe llevar secretos; si el Lead la edita con valores reales, debe renombrarla
+# fuera del control de versiones o usar variables de entorno del sitio en IIS.
+web.config.local
+*.secrets.json
+
+# User Secrets de desarrollo (viven fuera del repo, en el perfil del usuario, pero
+# por si acaso se generan localmente):
+secrets.json
+
+# ==== Sistema operativo / editores ====
+.DS_Store
+Thumbs.db
+*.swp

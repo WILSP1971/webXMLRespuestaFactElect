@@ -1,0 +1,21 @@
+/* Estilos especificos de la vista "XML Respuesta Dian" (SPEC-003). */
+
+.xml-viewer {
+  font-family: "Cascadia Code", "Consolas", "SFMono-Regular", Menlo, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  background-color: #f8f9fa; /* bg-light */
+  border: 1px solid #dee2e6; /* border-light */
+  border-radius: 0.375rem;
+  padding: 1rem;
+  max-height: 60vh;
+  overflow: auto; /* scroll vertical y horizontal */
+  white-space: pre;
+  tab-size: 2;
+  margin-bottom: 0;
+}
+
+.xml-viewer:focus-visible {
+  outline: 2px solid #0d6efd;
+  outline-offset: 2px;
+}
