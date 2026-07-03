@@ -32,7 +32,7 @@
                            aria-label="Nombre de empresa (completado automáticamente)" />
                 </div>
 
-                <!-- F-3: Tipo de Documento -->
+                <!-- F-3: Tipo de Documento (Codigo - Descripcion, value = Codigo) -->
                 <div class="col-12 col-md-6 col-lg-4">
                     <label for="selTipoDoc" class="form-label">Tipo de documento</label>
                     <select id="selTipoDoc" name="tipoDoc" class="form-select" required
@@ -58,13 +58,16 @@
                            class="form-control" placeholder="Ej. 185138" min="0" required />
                 </div>
 
-                <!-- F-6: Buscar -->
+                <!-- F-6: Buscar (con spinner prominente) -->
                 <div class="col-12 col-lg-2 d-grid">
                     <button type="submit" id="btnBuscar" class="btn btn-primary" disabled>
-                        <i class="bi bi-search me-1" aria-hidden="true"></i>
-                        <span class="btn-label">Buscar</span>
-                        <span class="spinner-border spinner-border-sm ms-1 d-none" role="status"
-                              aria-hidden="true" id="btnBuscarSpinner"></span>
+                        <span class="d-inline-flex align-items-center">
+                            <span id="btnBuscarIcono"><i class="bi bi-search me-1" aria-hidden="true"></i></span>
+                            <span class="btn-label">Buscar</span>
+                            <span class="spinner-border spinner-border-sm ms-2 d-none" role="status"
+                                  aria-hidden="true" id="btnBuscarSpinner"></span>
+                            <span class="visually-hidden" id="btnBuscarEstado">Listo</span>
+                        </span>
                     </button>
                 </div>
 
@@ -73,7 +76,19 @@
     </div>
 </div>
 
-<div class="card shadow-sm" id="panelResultado" aria-live="polite">
+<div class="card shadow-sm position-relative" id="panelResultado" aria-live="polite">
+    <!-- Overlay de carga: cubre el panel mientras la busqueda esta en vuelo -->
+    <div id="panelResultadoOverlay"
+         class="position-absolute top-0 start-0 w-100 h-100 d-none"
+         style="background: rgba(255,255,255,0.7); z-index: 10; display: flex; align-items: center; justify-content: center;">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-2" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Buscando&hellip;</span>
+            </div>
+            <div class="text-muted">Buscando registros&hellip;</div>
+        </div>
+    </div>
+
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h2 class="h6 mb-0">Resultado</h2>
         <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btnDescargar">
@@ -90,7 +105,7 @@
             para consultar el XML de respuesta.
         </div>
 
-        <!-- Estado cargando -->
+        <!-- Estado cargando (dentro del panel, sin overlay) -->
         <div id="estadoCargando" class="text-center text-muted py-5 d-none">
             <div class="spinner-border text-primary mb-2" role="status">
                 <span class="visually-hidden">Cargando&hellip;</span>
@@ -98,21 +113,22 @@
             <div>Consultando el XML de respuesta&hellip;</div>
         </div>
 
-        <!-- Estado sin resultados (NF-3 / AC-6) -->
+        <!-- Estado sin resultados: detalle se rellena por JS con los criterios -->
         <div id="estadoSinResultados" class="text-center text-muted py-5 d-none">
             <i class="bi bi-file-earmark-x fs-1 d-block mb-2" aria-hidden="true"></i>
-            No se encontró información para los criterios ingresados.
-            <div class="small">Verifique la empresa, el tipo de documento, el prefijo y el número.</div>
+            <div>No se encontraron registros para los criterios ingresados:</div>
+            <div class="small mt-2"><code id="estadoSinResultadosDetalle"></code></div>
+            <div class="small mt-2">Verifique la empresa, el tipo de documento, el prefijo y el número.</div>
         </div>
 
-        <!-- Estado error de conexión (NF-2 / AC-C3) -->
+        <!-- Estado error -->
         <div id="estadoError" class="alert alert-danger d-none" role="alert">
             <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
             <span id="estadoErrorMensaje">No fue posible completar la consulta. Intente nuevamente en unos minutos.</span>
             <div class="small mt-1">Si el problema persiste, contacte al administrador.</div>
         </div>
 
-        <!-- Estado con resultados: grid del historial (F-6) + visor del XML seleccionado (F-7) -->
+        <!-- Estado con resultados: grid + visor -->
         <div id="estadoConResultados" class="d-none">
             <div class="row g-3">
                 <div class="col-12 col-lg-6">

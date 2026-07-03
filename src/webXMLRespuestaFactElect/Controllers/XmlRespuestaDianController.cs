@@ -6,10 +6,6 @@ namespace webXMLRespuestaFactElect.Controllers;
 
 /// <summary>
 /// Controlador de la vista "XML Respuesta Dian" (unico foco funcional de SPEC-003).
-/// Todas las acciones de datos son de solo lectura y delegan en
-/// <see cref="IFactElectronicaRepository"/> (CHECKPOINT C5); no hay SQL de negocio
-/// inline aqui. Los errores de infraestructura se traducen a mensajes controlados
-/// (NF-2 / AC-C3), nunca se expone un stack trace al cliente.
 /// </summary>
 public sealed class XmlRespuestaDianController : Controller
 {
@@ -29,14 +25,15 @@ public sealed class XmlRespuestaDianController : Controller
         _logger = logger;
     }
 
-    /// <summary>Carga la vista "XML Respuesta Dian" (F-1..F-8). Los dropdowns se pueblan via fetch.</summary>
     [HttpGet]
     public IActionResult Index()
     {
         return View();
     }
 
-    /// <summary>F-1: poblado del dropdown Empresas desde GetEmpresas.</summary>
+    /// <summary>
+    /// F-1: dropdown Empresas -> GetEmpresas (sin parametros).
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> ObtenerEmpresas(CancellationToken ct)
     {
@@ -44,43 +41,43 @@ public sealed class XmlRespuestaDianController : Controller
 
         if (!resultado.Exitoso)
         {
-            _logger.LogWarning("Fallo al obtener empresas: {Mensaje}", resultado.MensajeError);
+            _logger.LogWarning("ObtenerEmpresas -> fallback 503: {Msg}", resultado.MensajeError);
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mensajeError = MensajeErrorEmpresas });
         }
-
-        return Json(resultado.Valor);
-    }
-
-    /// <summary>F-3: poblado del dropdown Tipo de Documento desde Get_TipoDocumentosFactElect.</summary>
-    [HttpGet]
-    public async Task<IActionResult> ObtenerTipoDocumentos(CancellationToken ct)
-    {
-        var resultado = await _repositorio.ObtenerTipoDocumentosAsync(ct);
-
-        if (!resultado.Exitoso)
-        {
-            _logger.LogWarning("Fallo al obtener tipos de documento: {Mensaje}", resultado.MensajeError);
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mensajeError = MensajeErrorTiposDocumento });
-        }
-
         return Json(resultado.Valor);
     }
 
     /// <summary>
-    /// F-6: invoca Get_LogWebService con los 4 parametros y devuelve TODAS las filas
-    /// del historial (FechaHoraLog, MetodoWs, RespuestaXML) para el grid de la vista,
-    /// con el XML de cada fila ya formateado (F-7). Lista vacia = "sin resultados"
-    /// (AC-6); `Error=true` = fallo controlado (AC-C3/NF-2).
+    /// F-3: dropdown Tipo de Documento -> Get_TipoDocumentosFactElect @codEmpresa.
+    /// Acepta `codEmpresa` como query param (cascada Empresa -> TipoDoc).
     /// </summary>
-    // Nota: sin [ValidateAntiForgeryToken] a proposito. La accion es de solo lectura
-    // (no muta estado ni datos de negocio); la app ahora exige autenticacion Windows
-    // integrada (revision de S-6, ver contexto/ESTADO.md), pero eso no cambia que el
-    // CSRF token no aporte proteccion adicional a una lectura idempotente.
+    [HttpGet]
+    public async Task<IActionResult> ObtenerTipoDocumentos([FromQuery(Name = "codEmpresa")] string? codEmpresa, CancellationToken ct)
+    {
+        _logger.LogInformation("ObtenerTipoDocumentos: codEmpresa='{Emp}'", codEmpresa ?? "(TODAS)");
+        var resultado = await _repositorio.ObtenerTipoDocumentosAsync(codEmpresa, ct);
+
+        if (!resultado.Exitoso)
+        {
+            _logger.LogWarning("ObtenerTipoDocumentos -> fallback 503: {Msg}", resultado.MensajeError);
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { mensajeError = MensajeErrorTiposDocumento });
+        }
+        return Json(resultado.Valor);
+    }
+
+    /// <summary>
+    /// F-6: Get_LogWebService @codEmpresa, @tipoDocumento, @prefijo, @noDocumento.
+    /// </summary>
     [HttpPost]
     public async Task<IActionResult> Buscar([FromBody] BuscarXmlRequest request, CancellationToken ct)
     {
+        _logger.LogInformation(
+            "Buscar: codEmpresa='{Emp}', tipoDocumento='{Td}', prefijo='{Pf}', noDocumento='{Nd}'",
+            request?.Empresa, request?.TipoDoc, request?.Prefijo, request?.NoDocumento);
+
         if (!TryValidarYNormalizarNoDocumento(request, out var noDocumento))
         {
+            _logger.LogWarning("Buscar: parametros invalidos");
             return BadRequest(BuscarXmlResponse.ConError(MensajeParametrosInvalidos));
         }
 
@@ -89,9 +86,11 @@ public sealed class XmlRespuestaDianController : Controller
 
         if (!resultado.Exitoso)
         {
-            _logger.LogWarning("Fallo al ejecutar Get_LogWebService: {Mensaje}", resultado.MensajeError);
+            _logger.LogWarning("Buscar -> fallback: {Msg}", resultado.MensajeError);
             return Json(BuscarXmlResponse.ConError(MensajeErrorBusqueda));
         }
+
+        _logger.LogInformation("Buscar -> devolvio {N} filas", resultado.Valor!.Count);
 
         var registros = resultado.Valor!
             .Select(registro => new LogWebServiceViewModel
@@ -108,7 +107,6 @@ public sealed class XmlRespuestaDianController : Controller
     private static bool TryValidarYNormalizarNoDocumento(BuscarXmlRequest request, out long noDocumento)
     {
         noDocumento = 0;
-
         if (request is null
             || string.IsNullOrWhiteSpace(request.Empresa)
             || string.IsNullOrWhiteSpace(request.TipoDoc)
@@ -117,7 +115,6 @@ public sealed class XmlRespuestaDianController : Controller
         {
             return false;
         }
-
         return long.TryParse(request.NoDocumento, out noDocumento) && noDocumento >= 0;
     }
 }

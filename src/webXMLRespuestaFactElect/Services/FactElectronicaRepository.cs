@@ -8,12 +8,7 @@ namespace webXMLRespuestaFactElect.Services;
 /// <summary>
 /// Implementacion de solo lectura de <see cref="IFactElectronicaRepository"/> sobre
 /// SQL Server, usando Microsoft.Data.SqlClient (ADO.NET) y ejecutando exclusivamente
-/// Stored Procedures parametrizados (CHECKPOINT C5). No contiene SQL de negocio
-/// inline: solo `CommandType.StoredProcedure` + parametros.
-///
-/// La cadena de conexion se obtiene de configuracion (clave
-/// "ConnectionStrings:CadenaConexionDB"), nunca hardcodeada (CHECKPOINT C3): en
-/// desarrollo via User Secrets, en IIS via variables de entorno / secret manager.
+/// Stored Procedures parametrizados (CHECKPOINT C5).
 /// </summary>
 public sealed class FactElectronicaRepository : IFactElectronicaRepository
 {
@@ -35,6 +30,8 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
         _cadenaConexion = configuracion.GetConnectionString("CadenaConexionDB") ?? string.Empty;
         _opciones = opciones.Value;
         _logger = logger;
+
+        _logger.LogInformation("FactElectronicaRepository cargado. ConnectionString length = {Len} chars.", _cadenaConexion.Length);
     }
 
     public async Task<OperationResult<IReadOnlyList<EmpresaViewModel>>> ObtenerEmpresasAsync(CancellationToken ct = default)
@@ -42,9 +39,10 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
         try
         {
             var resultado = new List<EmpresaViewModel>();
-
             await using var conexion = await AbrirConexionAsync(ct);
             await using var comando = CrearComando(conexion, CatalogosQuery.NombreStoredProcedureEmpresas);
+
+            _logger.LogInformation("Ejecutando SP: {Sp} (sin parametros)", CatalogosQuery.NombreStoredProcedureEmpresas);
 
             await using var lector = await comando.ExecuteReaderAsync(ct);
             while (await lector.ReadAsync(ct))
@@ -52,23 +50,45 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
                 resultado.Add(CatalogosQuery.MapearEmpresa(lector));
             }
 
+            _logger.LogInformation("ObtenerEmpresas -> {N} filas", resultado.Count);
             return OperationResult<IReadOnlyList<EmpresaViewModel>>.Ok(resultado);
         }
-        catch (Exception ex) when (EsErrorDeInfraestructura(ex))
+        catch (Exception ex)
         {
-            RegistrarErrorInfraestructura(ex, CatalogosQuery.NombreStoredProcedureEmpresas);
+            _logger.LogError(ex, "Fallo en ObtenerEmpresasAsync. Excepcion: {Tipo}", ex.GetType().FullName);
             return OperationResult<IReadOnlyList<EmpresaViewModel>>.Fallo(MensajeErrorGenerico);
         }
     }
 
-    public async Task<OperationResult<IReadOnlyList<TipoDocumentoViewModel>>> ObtenerTipoDocumentosAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Ejecuta `Get_TipoDocumentosFactElect @Empresa` (parametro OBLIGATORIO segun ALTER
+    /// PROCEDURE que confirmaste).
+    ///
+    /// Columnas que retorna el SP: Empresa, CodDocumento, NombreDocumento, TipoDocumento.
+    /// Cuando llamo sin empresa, mando `@Empresa = ''` (string vacio). El SP no falla,
+    /// solo devuelve 0 filas. Cuando seleccionan una empresa, se llena el dropdown.
+    /// </summary>
+    public async Task<OperationResult<IReadOnlyList<TipoDocumentoViewModel>>> ObtenerTipoDocumentosAsync(
+        string? codEmpresa = null,
+        CancellationToken ct = default)
     {
         try
         {
             var resultado = new List<TipoDocumentoViewModel>();
-
             await using var conexion = await AbrirConexionAsync(ct);
             await using var comando = CrearComando(conexion, CatalogosQuery.NombreStoredProcedureTipoDocumentos);
+
+            // SIEMPRE pasamos @Empresa porque el SP lo exige. Si codEmpresa es null/empty,
+            // pasamos string vacio: el filtro `where Empresa=@Empresa` no encuentra nada
+            // y devuelve 0 filas, pero la llamada no falla.
+            comando.Parameters.Add(new SqlParameter("@Empresa", SqlDbType.VarChar, 6)
+            {
+                Value = (object?)codEmpresa ?? string.Empty
+            });
+
+            _logger.LogInformation(
+                "Ejecutando SP: {Sp} @Empresa='{E}'",
+                CatalogosQuery.NombreStoredProcedureTipoDocumentos, codEmpresa ?? "(vacio)");
 
             await using var lector = await comando.ExecuteReaderAsync(ct);
             while (await lector.ReadAsync(ct))
@@ -76,29 +96,46 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
                 resultado.Add(CatalogosQuery.MapearTipoDocumento(lector));
             }
 
+            _logger.LogInformation("ObtenerTipoDocumentos -> {N} filas (Empresa='{E}')",
+                resultado.Count, codEmpresa ?? "(vacio)");
             return OperationResult<IReadOnlyList<TipoDocumentoViewModel>>.Ok(resultado);
         }
-        catch (Exception ex) when (EsErrorDeInfraestructura(ex))
+        catch (Exception ex)
         {
-            RegistrarErrorInfraestructura(ex, CatalogosQuery.NombreStoredProcedureTipoDocumentos);
+            _logger.LogError(ex, "Fallo en ObtenerTipoDocumentosAsync. Excepcion: {Tipo}", ex.GetType().FullName);
             return OperationResult<IReadOnlyList<TipoDocumentoViewModel>>.Fallo(MensajeErrorGenerico);
         }
     }
 
+    /// <summary>
+    /// Ejecuta `Get_LogWebService @Empresa, @CodTipoDocumento, @PrefijoDocumento, @NoDocumentoIni`.
+    /// Parametros exactos confirmados por vos contra el ALTER PROCEDURE:
+    ///   @Empresa            varchar(6)
+    ///   @CodTipoDocumento   varchar(20)
+    ///   @PrefijoDocumento   varchar(20)
+    ///   @NoDocumentoIni     decimal(20)
+    ///
+    /// Columnas que retorna: IdLog, FechaHoraLog, MetodoWs, RespuestaXML, Empresa,
+    /// CodDocumento, PrefijoSistema, NoFacturaSistema, MensajeSalida, TextoQR,
+    /// NoTransaccionFE, InputMetodo.
+    /// </summary>
     public async Task<OperationResult<IReadOnlyList<LogWebServiceViewModel>>> ObtenerHistorialLogAsync(
-        string empresa,
-        string tipoDoc,
-        string prefijo,
-        long noDocumento,
-        CancellationToken ct = default)
+        string codEmpresa, string codTipoDocumento, string prefijoDocumento, long noDocumento, CancellationToken ct = default)
     {
         try
         {
             var resultado = new List<LogWebServiceViewModel>();
-
             await using var conexion = await AbrirConexionAsync(ct);
             await using var comando = CrearComando(conexion, GetLogWebServiceQuery.NombreStoredProcedure);
-            comando.Parameters.AddRange(GetLogWebServiceQuery.ConstruirParametros(empresa, tipoDoc, prefijo, noDocumento));
+
+            comando.Parameters.Add(new SqlParameter("@Empresa", SqlDbType.VarChar, 6) { Value = codEmpresa });
+            comando.Parameters.Add(new SqlParameter("@CodTipoDocumento", SqlDbType.VarChar, 20) { Value = codTipoDocumento });
+            comando.Parameters.Add(new SqlParameter("@PrefijoDocumento", SqlDbType.VarChar, 20) { Value = prefijoDocumento });
+            comando.Parameters.Add(new SqlParameter("@NoDocumentoIni", SqlDbType.Decimal) { Value = (decimal)noDocumento });
+
+            _logger.LogInformation(
+                "Ejecutando SP: {Sp} @Empresa='{E}', @CodTipoDocumento='{T}', @PrefijoDocumento='{P}', @NoDocumentoIni={N}",
+                GetLogWebServiceQuery.NombreStoredProcedure, codEmpresa, codTipoDocumento, prefijoDocumento, noDocumento);
 
             await using var lector = await comando.ExecuteReaderAsync(ct);
             while (await lector.ReadAsync(ct))
@@ -106,24 +143,26 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
                 resultado.Add(GetLogWebServiceQuery.MapearFila(lector));
             }
 
-            // Lista vacia: "sin resultados" (AC-6), no es un error.
+            _logger.LogInformation("ObtenerHistorialLog -> {N} filas", resultado.Count);
             return OperationResult<IReadOnlyList<LogWebServiceViewModel>>.Ok(resultado);
         }
-        catch (Exception ex) when (EsErrorDeInfraestructura(ex))
+        catch (Exception ex)
         {
-            RegistrarErrorInfraestructura(ex, GetLogWebServiceQuery.NombreStoredProcedure);
+            _logger.LogError(ex, "Fallo en ObtenerHistorialLogAsync ({E}/{T}/{P}/{N}). Excepcion: {Tipo}",
+                codEmpresa, codTipoDocumento, prefijoDocumento, noDocumento, ex.GetType().FullName);
             return OperationResult<IReadOnlyList<LogWebServiceViewModel>>.Fallo(MensajeErrorGenerico);
         }
     }
 
     private async Task<SqlConnection> AbrirConexionAsync(CancellationToken ct)
     {
-        var builder = new SqlConnectionStringBuilder(_cadenaConexion)
+        var csb = new SqlConnectionStringBuilder(_cadenaConexion)
         {
-            ConnectTimeout = _opciones.ConexionTimeoutSegundos
+            ConnectTimeout = _opciones.ConexionTimeoutSegundos,
+            TrustServerCertificate = true
         };
 
-        var conexion = new SqlConnection(builder.ConnectionString);
+        var conexion = new SqlConnection(csb.ConnectionString);
         await conexion.OpenAsync(ct);
         return conexion;
     }
@@ -135,42 +174,5 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
             CommandType = CommandType.StoredProcedure,
             CommandTimeout = _opciones.ComandoTimeoutSegundos
         };
-    }
-
-    /// <summary>
-    /// Determina si la excepcion corresponde a una falla de infraestructura o de
-    /// configuracion (conexion, timeout, cadena de conexion ausente/mal formada,
-    /// ejecucion del SP) que debe traducirse a un mensaje controlado (NF-2 / AC-C3)
-    /// en vez de propagarse como stack trace/HTML al cliente que espera JSON.
-    /// Incluye <see cref="ArgumentException"/> y <see cref="FormatException"/> porque
-    /// <see cref="SqlConnectionStringBuilder"/>/<see cref="SqlConnection"/> las lanzan
-    /// cuando la cadena de conexion esta ausente o mal formada (FIX 2, ver revision
-    /// BLACK PANTHER/WOLVERINE).
-    /// </summary>
-    private static bool EsErrorDeInfraestructura(Exception ex) =>
-        ex is SqlException or InvalidOperationException or TimeoutException or ArgumentException or FormatException;
-
-    /// <summary>
-    /// Registra el error de infraestructura con un mensaje de log distinto segun la
-    /// causa, para facilitar el diagnostico: cadena de conexion mal formada/ausente
-    /// (error de configuracion, requiere revisar appsettings/User Secrets/variables de
-    /// entorno) vs. fallo real de conectividad/ejecucion contra SQL Server.
-    /// </summary>
-    private void RegistrarErrorInfraestructura(Exception ex, string nombreStoredProcedure)
-    {
-        if (ex is ArgumentException or FormatException)
-        {
-            _logger.LogError(
-                ex,
-                "Error de configuracion de la cadena de conexion (ConnectionStrings:CadenaConexionDB) al ejecutar {StoredProcedure}",
-                nombreStoredProcedure);
-        }
-        else
-        {
-            _logger.LogError(
-                ex,
-                "Error de conectividad/ejecucion contra la base de datos al ejecutar {StoredProcedure}",
-                nombreStoredProcedure);
-        }
     }
 }

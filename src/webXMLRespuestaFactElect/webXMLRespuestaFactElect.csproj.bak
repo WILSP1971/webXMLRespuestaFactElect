@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -8,12 +8,11 @@
     <UserSecretsId>b6f2a2e4-0c1a-4f0f-9a2a-webxmlrespuestafactelect</UserSecretsId>
     <!-- Hosting en IIS via ANCM in-process (ver README y web.config) -->
     <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="8.0.10" />
   </ItemGroup>
 
 </Project>
-
