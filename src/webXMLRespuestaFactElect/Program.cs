@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authentication.Negotiate;
+using Microsoft.AspNetCore.Authorization;
 using webXMLRespuestaFactElect.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,20 @@ builder.Services.Configure<FactElectronicaDbOptions>(
     builder.Configuration.GetSection(FactElectronicaDbOptions.SeccionConfiguracion));
 builder.Services.AddScoped<IFactElectronicaRepository, FactElectronicaRepository>();
 
+// Autenticacion Windows/AD integrada (revision de S-6: la app dejo de asumir "solo
+// LAN sin login"; ver contexto/ESTADO.md). En IIS, Negotiate delega el handshake al
+// modulo nativo de Windows Authentication (ver web.config); en Kestrel/dev usa SSPI
+// directamente. FallbackPolicy exige usuario autenticado en TODA la app salvo que
+// una accion se marque explicitamente [AllowAnonymous].
+builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
+    .AddNegotiate();
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
@@ -26,6 +42,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(

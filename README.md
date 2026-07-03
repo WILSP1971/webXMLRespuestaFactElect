@@ -130,6 +130,42 @@ parámetros de `Microsoft.Data.SqlClient`):
 6. Verificar que el Application Pool usa **"No Managed Code"** (requerido por ANCM).
 7. Confirmar conectividad de red del servidor IIS hacia `192.168.2.20\SIESA` (S-7).
 
+## Autenticación Windows/AD integrada
+
+La app dejó de asumir "sin login, solo LAN" (S-6 original, ver `contexto/ESTADO.md`).
+Ahora **toda la app exige una sesión de dominio autenticada** vía Windows
+Authentication (Negotiate), integrada con IIS. No hay pantalla de login propia:
+IIS/el navegador negocian las credenciales de Windows de forma transparente; el
+navbar muestra el usuario autenticado (`dominio\usuario`).
+
+### Requisitos en el servidor IIS
+
+1. Instalar el **rol/feature "Windows Authentication"** de IIS (no viene activado
+   por defecto): *Server Manager → Add Roles and Features → Web Server (IIS) →
+   Security → Windows Authentication*.
+2. El `web.config` versionado ya declara, dentro de `<system.webServer>`:
+   - `<anonymousAuthentication enabled="false" />`
+   - `<windowsAuthentication enabled="true" />`
+   - `forwardWindowsAuthToken="true"` en `<aspNetCore>` (requerido para que ANCM
+     reenvíe el token de Windows al proceso in-process).
+3. Si IIS rechaza estas secciones del `web.config` ("This configuration section
+   cannot be used at this path..."), desbloquear una vez en el servidor:
+   ```
+   %windir%\system32\inetsrv\appcmd.exe unlock config /section:windowsAuthentication
+   %windir%\system32\inetsrv\appcmd.exe unlock config /section:anonymousAuthentication
+   ```
+4. Confirmar que el Application Pool corre con una identidad con acceso al dominio
+   (normalmente basta con `ApplicationPoolIdentity` en un servidor unido al dominio).
+
+### Desarrollo local
+
+- `Properties/launchSettings.json` habilita `windowsAuthentication` / deshabilita
+  `anonymousAuthentication` para el perfil **IIS Express** (Windows).
+- Con el perfil Kestrel (`dotnet run`) Negotiate usa SSPI directamente; solo
+  funciona en una máquina Windows unida al dominio (o con Kerberos configurado).
+  En Linux/macOS de desarrollo, las peticiones no autenticadas recibirán `401`
+  esperado — no es un bug, es la ausencia de un KDC/SSPI local.
+
 ## Supuestos a confirmar por el Lead (ver SPEC-003 §9)
 
 - **S-1 / S-2:** nombres exactos de columnas de `GetEmpresas` y
@@ -144,5 +180,6 @@ parámetros de `Microsoft.Data.SqlClient`):
 ## Alcance y limitaciones (por diseño, ver SPEC-003)
 
 - Solo lectura: no hay inserciones, actualizaciones ni borrados.
-- Sin autenticación de usuarios (S-6): se asume acceso restringido por red LAN interna.
+- Requiere autenticación Windows/AD integrada (revisión de S-6; ver sección
+  "Autenticación Windows/AD integrada" arriba) — no hay acceso anónimo.
 - El ítem de menú "Otros" es un **placeholder** sin funcionalidad ("Próximamente").

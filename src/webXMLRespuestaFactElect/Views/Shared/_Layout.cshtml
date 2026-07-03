@@ -25,7 +25,7 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarPrincipal">
-                    <ul class="navbar-nav ms-auto">
+                    <ul class="navbar-nav ms-auto align-items-lg-center">
                         <li class="nav-item">
                             <a class="nav-link @(esVistaXmlRespuestaDian ? "active" : string.Empty)"
                                aria-current="@(esVistaXmlRespuestaDian ? "page" : null)"
@@ -39,6 +39,14 @@
                                 <span class="badge text-bg-secondary ms-1">Próximamente</span>
                             </a>
                         </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <span class="nav-link text-light-emphasis">
+                                    <i class="bi bi-person-badge me-1" aria-hidden="true"></i>@User.Identity!.Name
+                                </span>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>
