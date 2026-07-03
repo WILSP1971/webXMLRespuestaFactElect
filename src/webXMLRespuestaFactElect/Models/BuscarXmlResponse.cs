@@ -2,25 +2,18 @@ namespace webXMLRespuestaFactElect.Models;
 
 /// <summary>
 /// Respuesta JSON de la accion Buscar (F-6) consumida por fetch/AJAX desde la vista.
-/// Exactamente uno de los tres casos aplica: encontrado=true (con Xml), encontrado=false
-/// (sin resultados, AC-6), o error=true (fallo controlado, AC-C3/NF-2).
+/// `Registros` vacio es "sin resultados" (AC-6); `Error=true` es un fallo controlado
+/// (AC-C3/NF-2). El grid de la vista se llena directamente con `Registros`.
 /// </summary>
 public sealed class BuscarXmlResponse
 {
-    public bool Encontrado { get; init; }
-    public string? Xml { get; init; }
     public bool Error { get; init; }
     public string? MensajeError { get; init; }
+    public IReadOnlyList<LogWebServiceViewModel> Registros { get; init; } = Array.Empty<LogWebServiceViewModel>();
 
-    public static BuscarXmlResponse ConXml(string xml) => new()
+    public static BuscarXmlResponse ConRegistros(IReadOnlyList<LogWebServiceViewModel> registros) => new()
     {
-        Encontrado = true,
-        Xml = xml
-    };
-
-    public static BuscarXmlResponse SinResultados() => new()
-    {
-        Encontrado = false
+        Registros = registros
     };
 
     public static BuscarXmlResponse ConError(string mensajeError) => new()

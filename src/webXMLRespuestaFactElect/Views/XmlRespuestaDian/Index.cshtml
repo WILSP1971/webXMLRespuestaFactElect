@@ -112,10 +112,31 @@
             <div class="small mt-1">Si el problema persiste, contacte al administrador.</div>
         </div>
 
-        <!-- Estado con resultado (F-7) -->
-        <div id="estadoConXml" class="d-none">
-            <pre id="visorXml" class="xml-viewer" tabindex="0"
-                 aria-label="Contenido del XML de respuesta"><code></code></pre>
+        <!-- Estado con resultados: grid del historial (F-6) + visor del XML seleccionado (F-7) -->
+        <div id="estadoConResultados" class="d-none">
+            <div class="row g-3">
+                <div class="col-12 col-lg-6">
+                    <div class="table-responsive log-tabla-contenedor">
+                        <table class="table table-sm table-hover table-striped align-middle mb-0" id="tablaLog">
+                            <caption class="visually-hidden">Historial de llamadas al webservice para el documento consultado</caption>
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th scope="col">Fecha y hora</th>
+                                    <th scope="col">Método WS</th>
+                                    <th scope="col">Respuesta XML</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cuerpoTablaLog"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <label for="txtVisorXml" class="form-label">XML de la fila seleccionada</label>
+                    <textarea id="txtVisorXml" class="form-control xml-viewer" rows="18" readonly
+                              placeholder="Seleccione una fila del listado para ver su XML."
+                              aria-label="Contenido del XML de la fila seleccionada"></textarea>
+                </div>
+            </div>
         </div>
 
     </div>

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
 using webXMLRespuestaFactElect.Models;
 using webXMLRespuestaFactElect.Services;
 
@@ -68,13 +67,15 @@ public sealed class XmlRespuestaDianController : Controller
     }
 
     /// <summary>
-    /// F-6: invoca Get_LogWebService con los 4 parametros y devuelve el XML formateado
-    /// (F-7), o "sin resultados" (AC-6), o error controlado (AC-C3/NF-2).
+    /// F-6: invoca Get_LogWebService con los 4 parametros y devuelve TODAS las filas
+    /// del historial (FechaHoraLog, MetodoWs, RespuestaXML) para el grid de la vista,
+    /// con el XML de cada fila ya formateado (F-7). Lista vacia = "sin resultados"
+    /// (AC-6); `Error=true` = fallo controlado (AC-C3/NF-2).
     /// </summary>
     // Nota: sin [ValidateAntiForgeryToken] a proposito. La accion es de solo lectura
-    // (no muta estado ni datos de negocio) y la app no tiene autenticacion (S-6, LAN
-    // interna), por lo que el token CSRF no aporta proteccion adicional aqui; agregar
-    // JSON + antiforgery header requeriria wiring extra fuera del alcance de SPEC-003.
+    // (no muta estado ni datos de negocio); la app ahora exige autenticacion Windows
+    // integrada (revision de S-6, ver contexto/ESTADO.md), pero eso no cambia que el
+    // CSRF token no aporte proteccion adicional a una lectura idempotente.
     [HttpPost]
     public async Task<IActionResult> Buscar([FromBody] BuscarXmlRequest request, CancellationToken ct)
     {
@@ -83,7 +84,7 @@ public sealed class XmlRespuestaDianController : Controller
             return BadRequest(BuscarXmlResponse.ConError(MensajeParametrosInvalidos));
         }
 
-        var resultado = await _repositorio.ObtenerRespuestaXmlAsync(
+        var resultado = await _repositorio.ObtenerHistorialLogAsync(
             request.Empresa, request.TipoDoc, request.Prefijo, noDocumento, ct);
 
         if (!resultado.Exitoso)
@@ -92,57 +93,16 @@ public sealed class XmlRespuestaDianController : Controller
             return Json(BuscarXmlResponse.ConError(MensajeErrorBusqueda));
         }
 
-        if (string.IsNullOrWhiteSpace(resultado.Valor))
-        {
-            return Json(BuscarXmlResponse.SinResultados());
-        }
+        var registros = resultado.Valor!
+            .Select(registro => new LogWebServiceViewModel
+            {
+                FechaHoraLog = registro.FechaHoraLog,
+                MetodoWs = registro.MetodoWs,
+                RespuestaXml = XmlFormatter.Formatear(registro.RespuestaXml)
+            })
+            .ToList();
 
-        var xmlFormateado = XmlFormatter.Formatear(resultado.Valor);
-        return Json(BuscarXmlResponse.ConXml(xmlFormateado));
-    }
-
-    /// <summary>
-    /// F-8: descarga el XML como archivo .xml bien formado con exactamente el
-    /// contenido consultado. Re-ejecuta la misma consulta de solo lectura (misma
-    /// fuente de verdad que el visor) para evitar guardar estado de sesion en el
-    /// servidor.
-    /// </summary>
-    [HttpGet]
-    public async Task<IActionResult> Descargar(
-        string empresa, string tipoDoc, string prefijo, string noDocumento, CancellationToken ct)
-    {
-        var request = new BuscarXmlRequest
-        {
-            Empresa = empresa ?? string.Empty,
-            TipoDoc = tipoDoc ?? string.Empty,
-            Prefijo = prefijo ?? string.Empty,
-            NoDocumento = noDocumento ?? string.Empty
-        };
-
-        if (!TryValidarYNormalizarNoDocumento(request, out var noDocumentoNormalizado))
-        {
-            return BadRequest(MensajeParametrosInvalidos);
-        }
-
-        var resultado = await _repositorio.ObtenerRespuestaXmlAsync(
-            request.Empresa, request.TipoDoc, request.Prefijo, noDocumentoNormalizado, ct);
-
-        if (!resultado.Exitoso)
-        {
-            _logger.LogWarning("Fallo al ejecutar Get_LogWebService (descarga): {Mensaje}", resultado.MensajeError);
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, MensajeErrorBusqueda);
-        }
-
-        if (string.IsNullOrWhiteSpace(resultado.Valor))
-        {
-            return NotFound("No se encontro informacion para los criterios ingresados.");
-        }
-
-        var xmlFormateado = XmlFormatter.Formatear(resultado.Valor);
-        var bytes = Encoding.UTF8.GetBytes(xmlFormateado);
-        var nombreArchivo = $"RespuestaDian_{request.Prefijo}-{request.NoDocumento}.xml";
-
-        return File(bytes, "application/xml", nombreArchivo);
+        return Json(BuscarXmlResponse.ConRegistros(registros));
     }
 
     private static bool TryValidarYNormalizarNoDocumento(BuscarXmlRequest request, out long noDocumento)

@@ -21,50 +21,114 @@ electrónica. Stack: ASP.NET Core MVC (C#, net8.0), Razor + Bootstrap 5
 
 ## Estado actual (2026-07-03)
 
-Un único commit inicial en `main`: `fba6952 avance antes de cambiar de auth`
-(2026-07-03 16:52). Working tree limpio, sincronizado con `origin/main`.
+Commits en `main`, sincronizado con `origin/main` (push confirmado hasta
+`e07967b`):
 
-### Implementado
+1. `fba6952 avance antes de cambiar de auth` — funcionalidad F-1..F-8 completa
+   (búsqueda de un único XML).
+2. `e07967b Agregar autenticacion Windows/AD integrada (revision de S-6)` —
+   autenticación Windows/AD integrada implementada.
 
-- **Funcionalidad completa F-1 a F-8** (según nombres en el código):
-  - `HomeController` (mínimo) + `XmlRespuestaDianController` con las acciones:
-    - `Index` — vista principal.
-    - `ObtenerEmpresas` (F-1) — dropdown Empresas desde `GetEmpresas`.
-    - `ObtenerTipoDocumentos` (F-3) — dropdown Tipo de Documento desde
-      `Get_TipoDocumentosFactElect`.
-    - `Buscar` (F-6/F-7) — invoca `Get_LogWebService` con los 4 parámetros
-      (`@Empresa`, `@TipoDoc`, `@Prefijo`, `@NoDocumento`), formatea el XML
-      (`XmlFormatter.Formatear`) y devuelve JSON (éxito / sin resultados / error).
-    - `Descargar` (F-8) — re-ejecuta la misma consulta y devuelve el `.xml` como
-      archivo descargable (sin guardar estado de sesión en servidor).
-  - Capa de datos: `IFactElectronicaRepository` / `FactElectronicaRepository`
-    (ADO.NET puro), con mapeadores testables separados: `CatalogosQuery.cs`,
-    `GetLogWebServiceQuery.cs` (mapeo tolerante case-insensitive de columnas).
-  - `XmlFormatter` — prettify del XML antes de mostrar (F-7).
-  - Vista `XmlRespuestaDian/Index.cshtml` + JS (`xml-respuesta-dian.js`) que puebla
-    los dropdowns vía fetch y maneja búsqueda/descarga/errores controlados (AC-M2:
-    mensajes controlados si falla la carga de catálogos, no crash).
-  - Layout con navbar de 2 ítems; ítem "Otros" es **placeholder** ("Próximamente"),
-    sin funcionalidad (fuera de alcance de SPEC-003).
-  - **CHECKPOINT C3** (secreto de conexión): resuelto vía
-    `ConnectionStrings:CadenaConexionDB`, con instrucciones para User Secrets (dev)
-    y variables de entorno `ConnectionStrings__CadenaConexionDB` en IIS (prod).
-    `appsettings.example.json` versionado solo con placeholders;
-    `appsettings*.json` reales excluidos por `.gitignore`.
-  - **CHECKPOINT C7** (pruebas): suite xUnit en
-    `tests/webXMLRespuestaFactElect.Tests/` cubriendo armado de parámetros del SP,
-    mapeo tolerante de `RespuestaXML` (incluye "sin resultados"/`DBNull`), mapeo de
-    `GetEmpresas`/`Get_TipoDocumentosFactElect`, y el prettify del XML.
-  - `web.config` de referencia para IIS/ANCM in-process.
-  - **Sin autenticación de usuarios** (S-6 del SPEC): se asumió acceso restringido
-    solo por red LAN interna. **Esto es lo que está a punto de cambiar** (ver
-    "Próximo paso").
+**Sin commitear todavía** (pendiente de que el usuario decida): el cambio de
+"visor de un solo XML" a "grid + textarea" descrito abajo (implementado en esta
+sesión sobre el mismo working tree, pero aún no probado ni pusheado).
+
+### Implementado — base funcional (commit `fba6952`)
+
+- `HomeController` (mínimo) + `XmlRespuestaDianController`.
+- `ObtenerEmpresas` (F-1) / `ObtenerTipoDocumentos` (F-3) — dropdowns.
+- Capa de datos: `IFactElectronicaRepository` / `FactElectronicaRepository`
+  (ADO.NET puro), mapeadores testables: `CatalogosQuery.cs`,
+  `GetLogWebServiceQuery.cs` (mapeo tolerante case-insensitive de columnas).
+- `XmlFormatter` — prettify del XML antes de mostrar (F-7).
+- Layout con navbar de 2 ítems; ítem "Otros" es **placeholder** ("Próximamente").
+- **CHECKPOINT C3** (secreto de conexión): `ConnectionStrings:CadenaConexionDB`,
+  User Secrets (dev) / variable de entorno `ConnectionStrings__CadenaConexionDB`
+  (IIS). `appsettings.example.json` versionado solo con placeholders.
+- **CHECKPOINT C7** (pruebas): suite xUnit en
+  `tests/webXMLRespuestaFactElect.Tests/`.
+- `web.config` de referencia para IIS/ANCM in-process.
+
+### Implementado — autenticación Windows/AD (commit `e07967b`)
+
+- `Program.cs`: `AddAuthentication(NegotiateDefaults...).AddNegotiate()` +
+  `AddAuthorization` con `FallbackPolicy = RequireAuthenticatedUser()` (toda la
+  app exige login; no se usa `[AllowAnonymous]` en ningún lado hoy) +
+  `app.UseAuthentication()` antes de `UseAuthorization()`.
+- `web.config`: `<anonymousAuthentication enabled="false" />`,
+  `<windowsAuthentication enabled="true" />`, `forwardWindowsAuthToken="true"`
+  en `<aspNetCore>`. Requiere el feature "Windows Authentication" instalado en
+  IIS (no viene por defecto); comando `appcmd unlock config` documentado en el
+  propio `web.config` y en el README si la sección es rechazada.
+- `Properties/launchSettings.json` (nuevo): perfil IIS Express con
+  `windowsAuthentication: true` / `anonymousAuthentication: false`; perfil
+  Kestrel (`dotnet run`) usa SSPI directo (solo funciona en Windows
+  domain-joined; en Linux/Mac de dev da 401 esperado, no es bug).
+- `_Layout.cshtml`: navbar muestra `dominio\usuario` autenticado.
+- README: sección "Autenticación Windows/AD integrada".
+- **No probado end-to-end todavía** — este sandbox no tiene `dotnet` (ver
+  "Notas de entorno"). Pendiente que el usuario lo pruebe en un PC Windows.
+
+### Implementado — grid de resultados (sin commitear aún, en esta sesión)
+
+Cambio pedido por el usuario: la búsqueda ya no muestra un único XML, sino
+**todas las filas** que devuelve `Get_LogWebService` para los mismos criterios
+(el SP puede loguear varias llamadas de webservice por documento), en un grid.
+
+- **Modelo nuevo** `Models/LogWebServiceViewModel.cs`: `FechaHoraLog`
+  (`DateTime?`), `MetodoWs` (`string`), `RespuestaXml` (`string`).
+- `Services/GetLogWebServiceQuery.cs`: nuevo `MapearFila(IDataRecord)` →
+  `LogWebServiceViewModel` (reutiliza `MapearRespuestaXml` existente para la
+  columna XML; nombres de columna `FechaHoraLog`/`MetodoWs` tal como los dio el
+  usuario, case-insensitive vía `BuscarIndiceColumna`).
+- `IFactElectronicaRepository` / `FactElectronicaRepository`: el método
+  `ObtenerRespuestaXmlAsync` (devolvía `string?`, solo la primera fila) fue
+  **reemplazado** por `ObtenerHistorialLogAsync` (devuelve
+  `IReadOnlyList<LogWebServiceViewModel>`, lee TODAS las filas con
+  `while (await lector.ReadAsync(ct))`, igual patrón que `ObtenerEmpresasAsync`).
+- `Models/BuscarXmlResponse.cs`: simplificado a `Error` / `MensajeError` /
+  `Registros` (lista vacía = "sin resultados", ya no hay flag `Encontrado`).
+- `XmlRespuestaDianController.Buscar`: formatea el XML de **cada** fila
+  (`XmlFormatter.Formatear`) antes de devolver el JSON.
+- **Acción `Descargar` (GET) eliminada del controlador.** Con múltiples filas
+  por documento no había una forma limpia de identificar "cuál" descargar sin
+  agregar un parámetro/llave nueva; en vez de eso, la descarga ahora es
+  **100% client-side**: `xml-respuesta-dian.js` arma un `Blob` con el XML ya
+  mostrado en el textarea (`filaSeleccionada.respuestaXml`) y dispara la
+  descarga con un `<a download>` temporal. Sigue cumpliendo AC-8 (el archivo es
+  exactamente lo que se ve en pantalla) sin round-trip adicional al servidor.
+- Vista `Views/XmlRespuestaDian/Index.cshtml`: el bloque `estadoConXml` (un
+  `<pre>`) fue reemplazado por `estadoConResultados` con dos columnas: tabla
+  `#tablaLog` (thead Fecha y hora / Método WS / Respuesta XML, `tbody
+  #cuerpoTablaLog` poblado por JS) + `#txtVisorXml` (`<textarea readonly>`) al
+  lado.
+- `wwwroot/js/xml-respuesta-dian.js`: reescrito — `renderizarRegistros()` pinta
+  las filas del grid, `seleccionarFila(indice)` resalta la fila
+  (`table-active`) y vuelca `respuestaXml` en el textarea; clic o
+  Enter/Espacio en una fila selecciona; la primera fila se autoselecciona tras
+  buscar.
+- `wwwroot/css/site.css`: `.log-tabla-contenedor` (scroll, max-height 60vh),
+  `#tablaLog tbody tr { cursor: pointer; }`, `.log-columna-xml` (truncado con
+  ellipsis + `title` con el XML completo para hover).
+- Tests: `GetLogWebServiceQueryTests.cs` — agregadas
+  `MapearFila_MapeaFechaHoraLogMetodoWsYRespuestaXml_ParaElGridDeHistorial` y
+  `MapearFila_DevuelveValoresPorDefecto_CuandoLasColumnasNoExistenOSonNulas`.
+  No se tocó `FakeDataRecord.cs` (el mapeo usa `GetValue`, no `GetDateTime`).
+- Verificado por grep que no quedan referencias colgantes a
+  `ObtenerRespuestaXmlAsync`, `BuscarXmlResponse.ConXml/SinResultados`,
+  `estadoConXml`, `visorXml`, ni al endpoint `/XmlRespuestaDian/Descargar`.
+- **No compilado ni probado** (sin `dotnet` en este sandbox) — pendiente
+  `dotnet build` / `dotnet test` / prueba manual en el PC Windows del usuario.
+  Pendiente también decidir si se commitea/pushea este cambio.
 
 ### Seguridad — pendiente de acción del Lead (no es código)
 
 - La contraseña real de BD del proyecto original quedó expuesta en texto plano y
-  **debe rotarse en SQL Server**. El código nuevo no la contiene, pero la rotación
-  sigue pendiente y es responsabilidad del Lead.
+  **debe rotarse en SQL Server**. El código nuevo no la contiene.
+- El remoto `origin` (`git remote -v`) tiene un **GitHub Personal Access Token
+  embebido en texto plano en la URL** (visible en `.git/config`). Se le avisó al
+  usuario; recomendado rotarlo y reconfigurar el remoto sin el token embebido.
+  Estado: avisado, no resuelto.
 
 ### Supuestos sin confirmar por el Lead (SPEC-003 §9)
 
@@ -72,28 +136,28 @@ Un único commit inicial en `main`: `fba6952 avance antes de cambiar de auth`
   `Get_TipoDocumentosFactElect` (mapeo actual tolerante a variantes comunes).
 - **S-3:** nombre exacto de columna de salida de `Get_LogWebService` (se asume
   `RespuestaXML`, con tolerancia a variantes).
-- **S-4:** `GetFacturaElectronica` documentado pero **no cableado** a esta versión
-  de la UI.
+- **S-4:** `GetFacturaElectronica` documentado pero **no cableado** a esta
+  versión de la UI.
+- Las columnas `FechaHoraLog` y `MetodoWs` del grid se asumen con esos nombres
+  exactos (dados por el usuario), con matching case-insensitive pero **sin**
+  lista de variantes alternativas (a diferencia de S-1/S-2/S-3). Si el Lead
+  confirma nombres distintos, ajustar
+  `PosiblesNombresColumnaFechaHoraLog`/`PosiblesNombresColumnaMetodoWs` en
+  `GetLogWebServiceQuery.cs`.
 
-## Próximo paso (en curso / anunciado)
+## Próximo paso
 
-El mensaje del último commit ("avance antes de cambiar de auth") indica que el
-siguiente trabajo es **incorporar autenticación de usuarios**, lo cual revisa la
-decisión S-6 (antes: "sin auth, solo LAN"). Aún no se ha decidido/confirmado con
-el usuario:
-
-- Mecanismo de auth (Windows/AD integrado vía IIS, formulario con usuarios locales,
-  algún proveedor externo, etc.).
-- Si esto requiere un nuevo SPEC/ADR en el repo del enjambre o es una extensión de
-  SPEC-003/ADR-003.
-- Alcance: ¿toda la app requiere login, o solo ciertas acciones?
-
-**Antes de implementar, preguntar al usuario estos puntos** — no asumir el
-mecanismo de autenticación.
+1. Confirmar con el usuario si commitea/pushea el cambio del grid.
+2. Probar en el PC Windows (build + auth Windows integrada + grid) — este
+   sandbox no puede compilar/ejecutar la app.
+3. Rotar el PAT de GitHub expuesto en el remoto (pendiente, avisado al
+   usuario).
+4. Seguir pendientes ya conocidos: rotación de contraseña de BD, confirmación
+   de supuestos S-1..S-4 con el Lead.
 
 ## Notas de entorno
 
 - El entorno de este sandbox **no tiene `dotnet` instalado** (`dotnet --version`
   falla con "command not found"). No se puede compilar/testear localmente aquí;
-  cualquier verificación de build debe hacerse donde sí haya el SDK, o advertir
-  explícitamente esta limitación al usuario.
+  cualquier verificación de build debe hacerse donde sí haya el SDK (p. ej. el
+  PC Windows del usuario), o advertir explícitamente esta limitación.

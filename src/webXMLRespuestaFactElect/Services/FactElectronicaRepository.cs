@@ -85,7 +85,7 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
         }
     }
 
-    public async Task<OperationResult<string?>> ObtenerRespuestaXmlAsync(
+    public async Task<OperationResult<IReadOnlyList<LogWebServiceViewModel>>> ObtenerHistorialLogAsync(
         string empresa,
         string tipoDoc,
         string prefijo,
@@ -94,24 +94,25 @@ public sealed class FactElectronicaRepository : IFactElectronicaRepository
     {
         try
         {
+            var resultado = new List<LogWebServiceViewModel>();
+
             await using var conexion = await AbrirConexionAsync(ct);
             await using var comando = CrearComando(conexion, GetLogWebServiceQuery.NombreStoredProcedure);
             comando.Parameters.AddRange(GetLogWebServiceQuery.ConstruirParametros(empresa, tipoDoc, prefijo, noDocumento));
 
             await using var lector = await comando.ExecuteReaderAsync(ct);
-            if (await lector.ReadAsync(ct))
+            while (await lector.ReadAsync(ct))
             {
-                var xml = GetLogWebServiceQuery.MapearRespuestaXml(lector);
-                return OperationResult<string?>.Ok(xml);
+                resultado.Add(GetLogWebServiceQuery.MapearFila(lector));
             }
 
-            // Sin fila devuelta: "sin resultados" (AC-6), no es un error.
-            return OperationResult<string?>.Ok(null);
+            // Lista vacia: "sin resultados" (AC-6), no es un error.
+            return OperationResult<IReadOnlyList<LogWebServiceViewModel>>.Ok(resultado);
         }
         catch (Exception ex) when (EsErrorDeInfraestructura(ex))
         {
             RegistrarErrorInfraestructura(ex, GetLogWebServiceQuery.NombreStoredProcedure);
-            return OperationResult<string?>.Fallo(MensajeErrorGenerico);
+            return OperationResult<IReadOnlyList<LogWebServiceViewModel>>.Fallo(MensajeErrorGenerico);
         }
     }
 

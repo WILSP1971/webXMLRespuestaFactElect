@@ -9,8 +9,7 @@
   var urls = {
     empresas: "/XmlRespuestaDian/ObtenerEmpresas",
     tipoDocumentos: "/XmlRespuestaDian/ObtenerTipoDocumentos",
-    buscar: "/XmlRespuestaDian/Buscar",
-    descargar: "/XmlRespuestaDian/Descargar"
+    buscar: "/XmlRespuestaDian/Buscar"
   };
 
   var selEmpresa = document.getElementById("selEmpresa");
@@ -31,21 +30,24 @@
     cargando: document.getElementById("estadoCargando"),
     sinResultados: document.getElementById("estadoSinResultados"),
     error: document.getElementById("estadoError"),
-    conXml: document.getElementById("estadoConXml")
+    conResultados: document.getElementById("estadoConResultados")
   };
   var estadoErrorMensaje = document.getElementById("estadoErrorMensaje");
-  var visorXmlCode = document.querySelector("#visorXml code");
+  var cuerpoTablaLog = document.getElementById("cuerpoTablaLog");
+  var txtVisorXml = document.getElementById("txtVisorXml");
 
-  // Parametros de la ultima busqueda exitosa; se usan para la descarga (F-8) de modo
-  // que el archivo descargado corresponda exactamente al XML mostrado (AC-8), incluso
-  // si el usuario ya modifico los campos del formulario despues de buscar.
+  // Registros de la ultima busqueda (para el grid) y fila actualmente seleccionada
+  // (para el visor y la descarga). Parametros de la ultima busqueda exitosa, para
+  // construir el nombre del archivo descargado (AC-8).
+  var registrosActuales = [];
+  var filaSeleccionada = null;
   var ultimaBusquedaExitosa = null;
 
   function mostrarEstado(nombreEstado) {
     Object.keys(estados).forEach(function (clave) {
       estados[clave].classList.toggle("d-none", clave !== nombreEstado);
     });
-    btnDescargar.classList.toggle("d-none", nombreEstado !== "conXml");
+    btnDescargar.classList.toggle("d-none", nombreEstado !== "conResultados");
   }
 
   function actualizarDisponibilidadBuscar() {
@@ -141,6 +143,79 @@
     return !!selEmpresa.value && !!selTipoDoc.value && !!txtPrefijo.value.trim() && !!txtNoDocumento.value.trim();
   }
 
+  function formatearFechaHora(valorIso) {
+    if (!valorIso) {
+      return "";
+    }
+    var fecha = new Date(valorIso);
+    return isNaN(fecha.getTime()) ? valorIso : fecha.toLocaleString("es-CO");
+  }
+
+  function truncarTexto(texto, longitudMaxima) {
+    if (!texto) {
+      return "";
+    }
+    return texto.length > longitudMaxima ? texto.slice(0, longitudMaxima) + "…" : texto;
+  }
+
+  function limpiarSeleccion() {
+    filaSeleccionada = null;
+    txtVisorXml.value = "";
+  }
+
+  function seleccionarFila(indice) {
+    var filas = cuerpoTablaLog.querySelectorAll("tr");
+    filas.forEach(function (fila, i) {
+      fila.classList.toggle("table-active", i === indice);
+    });
+
+    filaSeleccionada = registrosActuales[indice];
+    txtVisorXml.value = filaSeleccionada.respuestaXml || "";
+  }
+
+  function renderizarRegistros(registros) {
+    registrosActuales = registros;
+    cuerpoTablaLog.innerHTML = "";
+    limpiarSeleccion();
+
+    registros.forEach(function (registro, indice) {
+      var fila = document.createElement("tr");
+      fila.setAttribute("role", "button");
+      fila.setAttribute("tabindex", "0");
+
+      var tdFecha = document.createElement("td");
+      tdFecha.textContent = formatearFechaHora(registro.fechaHoraLog);
+
+      var tdMetodo = document.createElement("td");
+      tdMetodo.textContent = registro.metodoWs;
+
+      var tdXml = document.createElement("td");
+      tdXml.className = "log-columna-xml";
+      tdXml.title = registro.respuestaXml || "";
+      tdXml.textContent = truncarTexto(registro.respuestaXml, 80);
+
+      fila.appendChild(tdFecha);
+      fila.appendChild(tdMetodo);
+      fila.appendChild(tdXml);
+
+      fila.addEventListener("click", function () {
+        seleccionarFila(indice);
+      });
+      fila.addEventListener("keydown", function (evento) {
+        if (evento.key === "Enter" || evento.key === " ") {
+          evento.preventDefault();
+          seleccionarFila(indice);
+        }
+      });
+
+      cuerpoTablaLog.appendChild(fila);
+    });
+
+    if (registros.length > 0) {
+      seleccionarFila(0);
+    }
+  }
+
   function alEnviarFormulario(evento) {
     evento.preventDefault();
 
@@ -175,14 +250,14 @@
           return;
         }
 
-        if (!datos.encontrado) {
+        if (!datos.registros || datos.registros.length === 0) {
           mostrarEstado("sinResultados");
           return;
         }
 
-        visorXmlCode.textContent = datos.xml;
+        renderizarRegistros(datos.registros);
         ultimaBusquedaExitosa = parametros;
-        mostrarEstado("conXml");
+        mostrarEstado("conResultados");
       })
       .catch(function () {
         estadoErrorMensaje.textContent =
@@ -195,12 +270,22 @@
   }
 
   function alDescargar() {
-    if (!ultimaBusquedaExitosa) {
+    if (!filaSeleccionada || !ultimaBusquedaExitosa) {
       return;
     }
 
-    var query = new URLSearchParams(ultimaBusquedaExitosa).toString();
-    window.location.href = urls.descargar + "?" + query;
+    // Descarga 100% client-side: el contenido ya fue entregado por el servidor y es
+    // exactamente el que se ve en el visor (AC-8), sin necesidad de otro round-trip.
+    var blob = new Blob([filaSeleccionada.respuestaXml || ""], { type: "application/xml" });
+    var url = URL.createObjectURL(blob);
+    var enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download =
+      "RespuestaDian_" + ultimaBusquedaExitosa.prefijo + "-" + ultimaBusquedaExitosa.noDocumento + ".xml";
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    URL.revokeObjectURL(url);
   }
 
   selEmpresa.addEventListener("change", alSeleccionarEmpresa);

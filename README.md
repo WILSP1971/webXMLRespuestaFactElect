@@ -96,6 +96,18 @@ Sin BD configurada, la vista carga igual: los dropdowns muestran un mensaje cont
 ("No fue posible cargar las empresas / los tipos de documento. Intente de nuevo.") en
 vez de fallar (AC-M2).
 
+## Resultado de la búsqueda: grid + visor (F-6/F-7/F-8)
+
+`Get_LogWebService` puede devolver varias filas (llamadas de webservice) para los
+mismos criterios de búsqueda. El resultado se muestra como un grid con las columnas
+**Fecha y hora**, **Método WS** y **Respuesta XML** (truncada); al hacer clic (o
+Enter/Espacio) sobre una fila, su XML completo se muestra en el textarea de solo
+lectura al lado del grid. Al buscar, la primera fila queda seleccionada
+automáticamente. El botón "Descargar XML" genera el archivo `.xml` **enteramente en
+el navegador** (Blob) a partir del contenido ya mostrado en el textarea — no hay una
+segunda llamada al servidor para la descarga, por lo que el archivo es siempre
+idéntico a lo que se ve en pantalla (AC-8).
+
 ## Ejecutar las pruebas (CHECKPOINT C7)
 
 ```bash
@@ -107,8 +119,9 @@ parámetros de `Microsoft.Data.SqlClient`):
 
 - El armado de los 4 parámetros de `Get_LogWebService` (`@Empresa`, `@TipoDoc`,
   `@Prefijo`, `@NoDocumento`) con el orden y tipo esperados.
-- El mapeo tolerante (case-insensitive) de la columna `RespuestaXML` a partir de una
-  fila simulada, incluyendo los casos "sin resultados" / `DBNull`.
+- El mapeo tolerante (case-insensitive) de las columnas `FechaHoraLog`, `MetodoWs` y
+  `RespuestaXML` de cada fila del historial (grid), incluyendo los casos "sin
+  resultados" / `DBNull`.
 - El mapeo de `GetEmpresas` / `Get_TipoDocumentosFactElect`.
 - El formateo (prettify) del XML antes de mostrarse (F-7).
 

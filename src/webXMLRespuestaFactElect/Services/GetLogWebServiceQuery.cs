@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.Data.SqlClient;
+using webXMLRespuestaFactElect.Models;
 
 namespace webXMLRespuestaFactElect.Services;
 
@@ -25,6 +26,9 @@ public static class GetLogWebServiceQuery
         "Respuesta_XML",
         "XML"
     };
+
+    private static readonly string[] PosiblesNombresColumnaFechaHoraLog = { "FechaHoraLog" };
+    private static readonly string[] PosiblesNombresColumnaMetodoWs = { "MetodoWs" };
 
     /// <summary>
     /// Construye los 4 parametros de `Get_LogWebService` en el orden y tipo esperados
@@ -69,6 +73,51 @@ public static class GetLogWebServiceQuery
 
         var valor = fila.GetValue(indice.Value)?.ToString();
         return string.IsNullOrWhiteSpace(valor) ? null : valor;
+    }
+
+    /// <summary>
+    /// Mapea una fila completa del historial (FechaHoraLog, MetodoWs, RespuestaXML)
+    /// para el grid de resultados de la vista (F-6). Reutiliza <see cref="MapearRespuestaXml"/>
+    /// para la columna del XML; el resto usa el mismo mapeo tolerante case-insensitive.
+    /// </summary>
+    public static LogWebServiceViewModel MapearFila(IDataRecord fila)
+    {
+        ArgumentNullException.ThrowIfNull(fila);
+
+        return new LogWebServiceViewModel
+        {
+            FechaHoraLog = ObtenerFecha(fila, PosiblesNombresColumnaFechaHoraLog),
+            MetodoWs = ObtenerTexto(fila, PosiblesNombresColumnaMetodoWs),
+            RespuestaXml = MapearRespuestaXml(fila) ?? string.Empty
+        };
+    }
+
+    private static string ObtenerTexto(IDataRecord fila, IReadOnlyList<string> posiblesNombres)
+    {
+        var indice = BuscarIndiceColumna(fila, posiblesNombres);
+        if (indice is null || fila.IsDBNull(indice.Value))
+        {
+            return string.Empty;
+        }
+
+        return fila.GetValue(indice.Value)?.ToString() ?? string.Empty;
+    }
+
+    private static DateTime? ObtenerFecha(IDataRecord fila, IReadOnlyList<string> posiblesNombres)
+    {
+        var indice = BuscarIndiceColumna(fila, posiblesNombres);
+        if (indice is null || fila.IsDBNull(indice.Value))
+        {
+            return null;
+        }
+
+        var valor = fila.GetValue(indice.Value);
+        if (valor is DateTime fecha)
+        {
+            return fecha;
+        }
+
+        return DateTime.TryParse(valor?.ToString(), out var fechaParseada) ? fechaParseada : null;
     }
 
     internal static int? BuscarIndiceColumna(IDataRecord fila, IReadOnlyList<string> posiblesNombres)

@@ -22,11 +22,11 @@ public interface IFactElectronicaRepository
 
     /// <summary>
     /// Ejecuta el SP `Get_LogWebService @Empresa, @TipoDoc, @Prefijo, @NoDocumento` y
-    /// devuelve el contenido crudo de la columna `RespuestaXML`, o null si no hubo
-    /// fila/columna (AC-6, "sin resultados").
+    /// devuelve TODAS las filas del historial (FechaHoraLog, MetodoWs, RespuestaXML)
+    /// para el grid de la vista (F-6). Lista vacia = "sin resultados" (AC-6).
     /// Ejemplo real: EXEC Get_LogWebService '07','FA','33',185138
     /// </summary>
-    Task<OperationResult<string?>> ObtenerRespuestaXmlAsync(
+    Task<OperationResult<IReadOnlyList<LogWebServiceViewModel>>> ObtenerHistorialLogAsync(
         string empresa,
         string tipoDoc,
         string prefijo,

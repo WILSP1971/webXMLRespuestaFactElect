@@ -90,4 +90,34 @@ public class GetLogWebServiceQueryTests
 
         Assert.Null(xml);
     }
+
+    [Fact]
+    public void MapearFila_MapeaFechaHoraLogMetodoWsYRespuestaXml_ParaElGridDeHistorial()
+    {
+        var fechaEsperada = new DateTime(2026, 6, 30, 14, 5, 0);
+        var fila = new FakeDataRecord()
+            .ConColumna("FechaHoraLog", fechaEsperada)
+            .ConColumna("MetodoWs", "EnvioFactura")
+            .ConColumna("RespuestaXML", "<RespuestaDian><Estado>Aceptado</Estado></RespuestaDian>");
+
+        var registro = GetLogWebServiceQuery.MapearFila(fila);
+
+        Assert.Equal(fechaEsperada, registro.FechaHoraLog);
+        Assert.Equal("EnvioFactura", registro.MetodoWs);
+        Assert.Equal("<RespuestaDian><Estado>Aceptado</Estado></RespuestaDian>", registro.RespuestaXml);
+    }
+
+    [Fact]
+    public void MapearFila_DevuelveValoresPorDefecto_CuandoLasColumnasNoExistenOSonNulas()
+    {
+        var fila = new FakeDataRecord()
+            .ConColumna("FechaHoraLog", DBNull.Value)
+            .ConColumna("MetodoWs", DBNull.Value);
+
+        var registro = GetLogWebServiceQuery.MapearFila(fila);
+
+        Assert.Null(registro.FechaHoraLog);
+        Assert.Equal(string.Empty, registro.MetodoWs);
+        Assert.Equal(string.Empty, registro.RespuestaXml);
+    }
 }
