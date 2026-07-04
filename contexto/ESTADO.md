@@ -22,12 +22,13 @@ electrónica. Stack: ASP.NET Core MVC (C#, net8.0), Razor + Bootstrap 5
 ## Estado actual (2026-07-04)
 
 Commits en `main`, sincronizado con `origin/main` (push confirmado hasta
-`3570495`):
+`01292c9`):
 
 1. `fba6952 avance antes de cambiar de auth` — funcionalidad F-1..F-8 completa
    (búsqueda de un único XML).
 2. `e07967b Agregar autenticacion Windows/AD integrada (revision de S-6)` —
-   autenticación Windows/AD integrada implementada.
+   autenticación Windows/AD integrada implementada. **Revertida más adelante
+   por `01292c9`, ver abajo — ya NO está vigente.**
 3. `2c4e3eb Reemplazar el visor de un solo XML por un grid + textarea
    (historial completo)` — cambio de "visor de un solo XML" a "grid +
    textarea" (ver detalle más abajo), ya commiteado.
@@ -36,7 +37,12 @@ Commits en `main`, sincronizado con `origin/main` (push confirmado hasta
    ver detalle en "Implementado — correcciones dropdown/búsqueda" más abajo.
 6. `3570495 Corregir dropdown de Empresa y unificar txtEmpresa para toda la
    busqueda` — ver detalle en "Implementado — dropdown de Empresa y
-   txtEmpresa" más abajo. **Pusheado a origin/main.**
+   txtEmpresa" más abajo.
+7. `3ebfcdb Actualizar ESTADO.md con las correcciones de dropdown
+   Empresa/TipoDoc` — solo actualización de este archivo, sin cambios de código.
+8. `01292c9 fix(iis): despliegue como sub-app anonima con PathBase y URLs
+   base-aware` — ver detalle en "Implementado — despliegue como sub-app
+   anónima de IIS" más abajo. **Pusheado a origin/main.**
 
 ### Implementado — base funcional (commit `fba6952`)
 
@@ -54,7 +60,13 @@ Commits en `main`, sincronizado con `origin/main` (push confirmado hasta
   `tests/webXMLRespuestaFactElect.Tests/`.
 - `web.config` de referencia para IIS/ANCM in-process.
 
-### Implementado — autenticación Windows/AD (commit `e07967b`)
+### Implementado — autenticación Windows/AD (commit `e07967b`) — **REVERTIDO en `01292c9`**
+
+> ⚠️ Esta sección describe una decisión que ya NO está vigente. Se deja el
+> detalle histórico porque el código (`Properties/launchSettings.json` con
+> `windowsAuthentication`, comentarios en `web.config`/README) todavía tiene
+> rastros de este enfoque; no reintroducir `Negotiate`/`RequireAuthenticatedUser`
+> sin que el usuario lo pida explícitamente otra vez.
 
 - `Program.cs`: `AddAuthentication(NegotiateDefaults...).AddNegotiate()` +
   `AddAuthorization` con `FallbackPolicy = RequireAuthenticatedUser()` (toda la
@@ -71,8 +83,43 @@ Commits en `main`, sincronizado con `origin/main` (push confirmado hasta
   domain-joined; en Linux/Mac de dev da 401 esperado, no es bug).
 - `_Layout.cshtml`: navbar muestra `dominio\usuario` autenticado.
 - README: sección "Autenticación Windows/AD integrada".
-- **No probado end-to-end todavía** — este sandbox no tiene `dotnet` (ver
-  "Notas de entorno"). Pendiente que el usuario lo pruebe en un PC Windows.
+- **Nunca se llegó a probar end-to-end** (este sandbox no tenía `dotnet`) antes
+  de que `01292c9` revirtiera el enfoque — ver motivo en la sección siguiente.
+
+### Implementado — despliegue como sub-app anónima de IIS (commit `01292c9`, pusheado)
+
+Hecho en otra sesión (`Co-Authored-By: Claude Opus 4.8`), no en la que generó las
+secciones anteriores. Motivo (según el mensaje del commit): la app se despliega
+como **sub-aplicación** de IIS bajo un `PathBase` (`/LogWebServiceFactElectronica`),
+y eso rompía tanto la autenticación Windows integrada como las URLs absolutas que
+usaba el JS (daban 404 dentro de la sub-app).
+
+- **Autenticación Windows/AD retirada**: `Program.cs` ya no registra
+  `Negotiate`/`AddAuthorization`; `web.config` volvió a acceso anónimo
+  (`anonymousAuthentication` habilitado, sin `windowsAuthentication`). La app
+  vuelve a ser de acceso anónimo, como lo era antes de `e07967b` (revisión de
+  S-6 sin autenticación, otra vez vigente).
+- **`PathBase` en `Program.cs`**: se agregó `app.UsePathBase(...)` **antes** del
+  resto del pipeline, leyendo el path base (p. ej. `/LogWebServiceFactElectronica`)
+  desde una variable de entorno (`AppPathBase`, configurada también en
+  `web.config`).
+- **Vista `Index.cshtml`**: ahora inyecta `window.APP_URLS` armado con
+  `@Url.Action(...)` en Razor (server-side), que ya respeta el `PathBase`
+  configurado.
+- **`wwwroot/js/xml-respuesta-dian.js`**: usa `window.APP_URLS` en vez de
+  construir las URLs de `ObtenerEmpresas`/`ObtenerTipoDocumentos`/`Buscar` como
+  rutas absolutas hardcodeadas — eso es lo que causaba los 404 bajo la sub-app.
+- `web.config`: simplificado (pasó de 37 líneas relacionadas con Windows Auth a
+  mucho menos), con la variable de entorno `AppPathBase` para que IIS y
+  `Program.cs` queden alineados y no se rompa el acceso al republicar.
+- Nota del propio commit: la cadena de conexión apunta a la instancia SIESA por
+  su **puerto TCP** (no por instance name `\SIESA`); `appsettings.json` sigue
+  fuera de git.
+- **Tampoco se ha probado end-to-end en este sandbox** (sigue sin `dotnet`).
+  Pendiente confirmar en IIS real: que la sub-app cargue bajo el PathBase, que
+  los dropdowns/búsqueda/descarga funcionen con `window.APP_URLS`, y que el
+  acceso anónimo sea aceptable (ya no hay control de quién entra más allá de la
+  red LAN — mismo supuesto S-6 original, otra vez vigente).
 
 ### Implementado — grid de resultados (sin commitear aún, en esta sesión)
 
@@ -196,6 +243,35 @@ Direccion, Telefonos, Estado, PaginaWeb, LogoEmpresa, TipoLogo`).
 - **No compilado ni probado** (sin `dotnet` en este sandbox) — pendiente
   verificación end-to-end en el entorno del usuario.
 
+### Implementado — descarga detecta formato XML vs JSON (sin commitear aún, en esta sesión)
+
+Pedido por el usuario: la columna `RespuestaXML` puede contener, según el caso,
+XML o JSON; el botón "Descargar" debe generar el archivo con la extensión y
+tipo MIME correctos según el contenido real de la fila seleccionada, en vez de
+asumir siempre `.xml`.
+
+- `wwwroot/js/xml-respuesta-dian.js` — dentro de `alDescargar()` (100%
+  client-side, sin round-trip al servidor, igual que antes):
+  - `esContenidoJson(texto)`: exige que el texto recortado empiece por `{` o
+    `[` y que `JSON.parse` no lance excepción.
+  - `esContenidoXml(texto)`: exige que empiece por `<` y que `DOMParser`
+    (`parseFromString(..., "application/xml")`) no produzca un nodo
+    `parsererror`.
+  - Si `esContenidoJson` es verdadero: descarga con `type: "application/json"`
+    y extensión `.json`. En cualquier otro caso (XML válido, o ninguno de los
+    dos — con un `console.warn` para ese último caso) se mantiene el
+    comportamiento previo: `type: "application/xml"` y extensión `.xml`.
+  - No se tocó el backend: `XmlFormatter.Formatear` (llamado en
+    `XmlRespuestaDianController.Buscar` para cada fila) ya devuelve el
+    contenido **sin modificar** cuando no es XML parseable (captura
+    `XmlException` y retorna el texto crudo), así que un `RespuestaXML` que en
+    realidad sea JSON llega intacto al cliente — no requería cambios.
+- No se agregó pretty-print de JSON en el visor/grid (no fue parte de lo
+  pedido); si se quiere formatear JSON legible además de XML, sería un cambio
+  aparte en `XmlFormatter`/controlador.
+- **No probado end-to-end** (sin `dotnet` en este sandbox, y sin un caso real
+  con `RespuestaXML` en JSON a mano para verificar contra la BD real).
+
 ### Seguridad — pendiente de acción del Lead (no es código)
 
 - La contraseña real de BD del proyecto original quedó expuesta en texto plano y
@@ -224,12 +300,23 @@ Direccion, Telefonos, Estado, PaginaWeb, LogoEmpresa, TipoLogo`).
   confirma nombres distintos, ajustar
   `PosiblesNombresColumnaFechaHoraLog`/`PosiblesNombresColumnaMetodoWs` en
   `GetLogWebServiceQuery.cs`.
+- **S-6 (autenticación) vuelve a estar "sin confirmar/decidido" en el sentido
+  original**: tras `01292c9` la app es de acceso anónimo otra vez (ver
+  "Implementado — despliegue como sub-app anónima de IIS"). El intento de
+  Windows/AD integrada (`e07967b`) quedó revertido. Si se retoma la idea de
+  requerir login, coordinarlo con el hecho de que ahora se despliega como
+  sub-app con `PathBase`.
 
 ## Próximo paso
 
-1. Probar en el PC Windows (build + auth Windows integrada + grid + dropdown
-   de Empresa + dropdown de tipo de documento + validación de Buscar +
-   descarga) — este sandbox no puede compilar/ejecutar la app.
+1. Probar en el entorno real de IIS (build + despliegue como sub-app anónima
+   bajo el `PathBase` configurado + `window.APP_URLS` + grid + dropdown de
+   Empresa + dropdown de tipo de documento + validación de Buscar + descarga
+   con detección de formato XML/JSON) — este sandbox no puede
+   compilar/ejecutar la app. Ya NO aplica probar autenticación Windows
+   integrada (fue revertida en `01292c9`). Para la descarga, probar
+   específicamente con un documento cuyo `RespuestaXML` real sea JSON, para
+   confirmar que baja como `.json` y no como `.xml`.
 2. Rotar el PAT de GitHub expuesto en el remoto (pendiente, avisado al
    usuario).
 3. Seguir pendientes ya conocidos: rotación de contraseña de BD, confirmación

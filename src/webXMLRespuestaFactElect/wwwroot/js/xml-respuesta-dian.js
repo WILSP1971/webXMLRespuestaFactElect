@@ -376,9 +376,51 @@
 
   // -- Descarga ----------------------------------------------
 
+  // Determina si el contenido es JSON valido (objeto o arreglo). Se exige que
+  // empiece por "{"/"[" antes de intentar el parse, para no tratar como JSON
+  // valores simples ("123", "null", etc.) que tecnicamente parsean pero no son
+  // el formato que interesa distinguir aqui.
+  function esContenidoJson(texto) {
+    if (!texto) return false;
+    var recortado = texto.trim();
+    if (!recortado || (recortado[0] !== "{" && recortado[0] !== "[")) return false;
+    try {
+      JSON.parse(recortado);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Determina si el contenido es XML valido (documento bien formado). Se exige
+  // que empiece por "<" antes de parsear con DOMParser.
+  function esContenidoXml(texto) {
+    if (!texto) return false;
+    var recortado = texto.trim();
+    if (!recortado || recortado[0] !== "<") return false;
+    try {
+      var doc = new DOMParser().parseFromString(recortado, "application/xml");
+      return !doc.getElementsByTagName("parsererror").length;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function alDescargar() {
     if (!filaSeleccionada || !ultimaBusquedaExitosa) return;
-    var blob = new Blob([filaSeleccionada.respuestaXml || ""], { type: "application/xml" });
+
+    var contenido = filaSeleccionada.respuestaXml || "";
+    var esJson = esContenidoJson(contenido);
+    var extension = esJson ? "json" : "xml";
+    var tipoMime = esJson ? "application/json" : "application/xml";
+
+    // Si no es JSON ni XML valido, se descarga igual como .xml (comportamiento
+    // previo): RespuestaXML es el formato esperado por defecto.
+    if (!esJson && !esContenidoXml(contenido)) {
+      console.warn("[DESCARGAR] El contenido no es XML ni JSON valido; se descarga como .xml de todas formas.");
+    }
+
+    var blob = new Blob([contenido], { type: tipoMime });
     var urlBlob = URL.createObjectURL(blob);
 
     var nombreEmpresa = txtNombreEmpresa.value || "";
@@ -390,7 +432,7 @@
       (ultimaBusquedaExitosa.prefijo || "") +
       "-" +
       (ultimaBusquedaExitosa.noDocumento || "") +
-      ".xml";
+      "." + extension;
     var enlace = document.createElement("a");
     enlace.href = urlBlob;
     enlace.download = nombreArchivo;
