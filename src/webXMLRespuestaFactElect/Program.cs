@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Authentication.Negotiate;
-using Microsoft.AspNetCore.Authorization;
 using webXMLRespuestaFactElect.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,23 +10,12 @@ builder.Services.Configure<FactElectronicaDbOptions>(
     builder.Configuration.GetSection(FactElectronicaDbOptions.SeccionConfiguracion));
 builder.Services.AddScoped<IFactElectronicaRepository, FactElectronicaRepository>();
 
-// Autenticacion Windows/AD integrada.
-builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-    .AddNegotiate();
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-});
-
 var app = builder.Build();
 
-app.UseAuthentication();
-app.UseAuthorization();
+// PathBase DEBE ir PRIMERO (antes de cualquier otro middleware)
+app.UsePathBase(builder.Configuration["AppPathBase"] ?? "/LogWebServiceFactElectronica");
 
-// PAGINA DE EXCEPCIONES DE DEVELOPER: muestra el stack trace real en el navegador
-// cuando algo se rompe (en vez de un 500 mudo). Solo activo en Development.
+// PAGINA DE EXCEPCIONES DE DEVELOPER
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -42,6 +29,8 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+// NO hay autenticación/autorización (ya se eliminó)
 
 app.MapControllerRoute(
     name: "default",

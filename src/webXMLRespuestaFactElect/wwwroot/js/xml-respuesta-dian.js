@@ -10,10 +10,12 @@
 (function () {
   "use strict";
 
-  var urls = {
-    empresas: "/XmlRespuestaDian/ObtenerEmpresas",
-    tipoDocumentos: "/XmlRespuestaDian/ObtenerTipoDocumentos",
-    buscar: "/XmlRespuestaDian/Buscar"
+  // URLs inyectadas por la vista con Url.Action (respetan el PathBase de la sub-app).
+  // Respaldo RELATIVO (sin "/" inicial) por si la vista no las define.
+  var urls = window.APP_URLS || {
+    empresas: "XmlRespuestaDian/ObtenerEmpresas",
+    tipoDocumentos: "XmlRespuestaDian/ObtenerTipoDocumentos",
+    buscar: "XmlRespuestaDian/Buscar"
   };
 
   var selEmpresa = document.getElementById("selEmpresa");

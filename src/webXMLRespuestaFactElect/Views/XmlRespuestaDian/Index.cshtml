@@ -163,5 +163,14 @@
 </div>
 
 @section Scripts {
+    <script>
+        // URLs generadas en el servidor: respetan el PathBase (/LogWebServiceFactElectronica)
+        // aunque la app corra como sub-aplicacion de IIS.
+        window.APP_URLS = {
+            empresas: "@Url.Action("ObtenerEmpresas", "XmlRespuestaDian")",
+            tipoDocumentos: "@Url.Action("ObtenerTipoDocumentos", "XmlRespuestaDian")",
+            buscar: "@Url.Action("Buscar", "XmlRespuestaDian")"
+        };
+    </script>
     <script src="~/js/xml-respuesta-dian.js"></script>
 }
